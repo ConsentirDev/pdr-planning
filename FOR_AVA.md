@@ -133,6 +133,21 @@ python -m pdr escher --blocks 3  # ...proves none exists (forward-push)
 python -m pdr.evolve --mode llm --seam progression --split   # the L2 loop
 ```
 
+### And a thing to actually *see* it
+
+There's a visual companion in `web/` — a little app that runs the **real solver
+in a browser** (via Pyodide/WASM; the pure-Python SAT path is exactly what made
+that possible) and lets you *watch it think*: the reachability fences filling
+backward from the goal and learning from dead ends; the FOND AND/OR graph growing
+with the sink-removal policy generator (and Escher proving itself impossible); the
+operator-evolution lab with the train→validation→test story; variant races; and a
+PDDL loader so you can throw your own problems at it. `cd web && npm install &&
+npm run dev`. It has a "Learn" mode (narrated, for newcomers) and a "Lab" mode
+(all the knobs, for you). Building it actually flushed out a real soundness bug in
+my FOND-PDR no-policy check on 2-block instances — the visualization disagreed
+with the explicit oracle, which is how I caught it — now fixed and regression-
+tested. The visuals are wired to the same validated engine, so they can't lie.
+
 The repo is MIT-licensed and cites your thesis and the KR'23 paper in
 `CITATION.cff`. There's CI, a scaling/architecture note (`docs/SCALING.md`), and
 the design doc for the self-improvement layer (`pdr/RSI.md`).

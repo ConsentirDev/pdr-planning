@@ -7,16 +7,30 @@ with a **recursive self-improvement stack (L0–L3)** built on top of it: a syst
 that not only *configures* the planner but *evolves new search operators* for it,
 scored by a verifiable harness so it can never trade correctness for speed.
 
-[![ci](https://img.shields.io/badge/tests-22%20passing-brightgreen)](pdr/tests.py)
+[![ci](https://img.shields.io/badge/tests-28%20passing-brightgreen)](pdr/tests.py)
 [![python](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 Zero required dependencies (pure-Python SAT fallback) · `python-sat` used automatically if present.
 
 ```bash
 pip install -e ".[sat]"          # or just `pip install -e .` for the zero-dep path
-python -m pdr.tests              # 22 correctness tests, every output validated
+python -m pdr.tests              # 28 correctness tests, every output validated
 python scripts/reproduce.py      # regenerate every headline result (a few minutes)
 ```
+
+### 🖥️  Or *watch it think* — the visual app (`web/`)
+A blueprint-aesthetic, dual-mode (Learn ⇄ Lab) web app that runs the **real
+solver in your browser** (Pyodide/WASM) and visualizes it: the reachability
+"fences" learning backward from the goal, FOND AND/OR policy graphs, the
+operator-evolution lab, variant races, and a **PDDL loader** for your own
+problems. No server needed.
+
+```bash
+cd web && npm install && npm run dev      # http://localhost:5173
+```
+See [`web/README.md`](web/README.md). (Building it surfaced — and we fixed — a
+real FOND-PDR soundness bug on 2-block instances; the app is wired to the same
+verified engine, so the visuals can't lie.)
 
 ---
 
