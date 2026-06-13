@@ -27,7 +27,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from .pdr import PDR, Result, _PDRTimeout
+from .pdr import PDR, Result
 
 
 class PSPDR(PDR):

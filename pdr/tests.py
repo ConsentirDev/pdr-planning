@@ -51,7 +51,8 @@ def test_sat_backends_agree():
                 break
         for S in _solvers():
             s = S()
-            vs = [s.new_var() for _ in range(nv)]
+            for _ in range(nv):
+                s.new_var()
             for cl in cnf:
                 s.add_clause(cl)
             assert s.solve() == truth, (S.__name__, cnf, truth)
@@ -256,7 +257,7 @@ def test_selfimprove_capability_grows():
 def test_operators_preserve_correctness():
     # Every seam operator -- even a deliberately silly one -- must still yield
     # correct, validated results. This is the safety-by-construction guarantee.
-    from .operators import seed_operators, Operator, baseline_operator
+    from .operators import seed_operators, Operator
     probs = [logistics(3, 2), logistics(3, 3), blocksworld(3), unsolvable_logistics()]
     silly = [
         Operator("silly-obl", "obligation", "source",
@@ -296,7 +297,7 @@ def test_evolution_finds_safe_improvement():
 def test_progression_beats_fixed_pdr_m():
     # The evolved adaptive look-ahead should match-or-beat fixed PDR-M (F=3).
     from .evolve import evaluate, reference_table, build_instances
-    from .operators import baseline_operator, Operator, seed_operators
+    from .operators import Operator, seed_operators
     held = build_instances([("logistics-6-3", lambda: logistics(6, 3)),
                             ("blocks-6", lambda: blocksworld(6))])
     refs = reference_table(held, 10.0, 80)
@@ -327,7 +328,7 @@ def test_llm_pipeline_gates_and_archives():
 
 
 def test_reason_transfer_is_sound():
-    from .transfer import transfer, verify_reason, harvest_reasons
+    from .transfer import transfer, verify_reason
     # 1) seeded solving preserves the answer + plan validity (solvable + unsolvable)
     pairs = [(logistics(3, 2), logistics(5, 3)),
              (blocksworld(3), blocksworld(5))]

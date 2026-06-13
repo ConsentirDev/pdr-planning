@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import re
 import time
-from itertools import permutations
 
 from .planning import Problem
 from .pdr import PDR

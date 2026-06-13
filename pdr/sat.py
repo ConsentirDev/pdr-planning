@@ -205,7 +205,6 @@ class DpllSolver(_BaseSolver):
         # Iterative decisions with chronological backtracking.
         # decisions: list of (trail_len_before_decision, decision_lit, flipped)
         decisions = []
-        base_trail = len(trail)
 
         def next_unassigned():
             for v in range(1, nv + 1):

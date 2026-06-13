@@ -214,7 +214,6 @@ def evolutionary_search(seam="obligation", instances=None, generations=6,
 # L2 -- LLM-in-the-loop search (proposer writes operator SOURCE)
 # ---------------------------------------------------------------------------
 def build_prompt(seam, archive, baseline_ev):
-    feats = (ops.OBL_FEATURE_KEYS if seam == "obligation" else ops.REASON_FEATURE_KEYS)
     leaderboard = "\n".join(f"  {name}: {sc} SAT calls" for name, sc in archive.summary()) or "  (empty)"
     if seam == "obligation":
         sig = ("def score(f, entry, state, ctx):\n    # higher score == popped first\n"

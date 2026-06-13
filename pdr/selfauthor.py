@@ -20,11 +20,9 @@ asserted.
 from __future__ import annotations
 
 import math
-import time
-from dataclasses import dataclass
 
 from . import domains
-from .selfimprove import features as base_features, config_space, run_config, Config
+from .selfimprove import features as base_features, config_space, run_config
 
 
 # ---------------------------------------------------------------------------

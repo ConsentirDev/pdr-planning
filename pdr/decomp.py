@@ -30,7 +30,6 @@ Every sub-problem here is solved with the classical PDR from `pdr.py`.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 
 from .planning import Problem, validate_plan
@@ -285,7 +284,6 @@ class PDPDR:
 
     def solve(self) -> DResult:
         p = self.p
-        t0 = time.perf_counter()
         edges = dependency_edges(p)
         relevant = goal_relevant(p, edges)
         ladg = LADG(p, edges, relevant)

@@ -43,3 +43,8 @@ markers = ["slow: longer-running evolutionary/meta tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
+# E741: `l` is the idiomatic name for a SAT literal throughout this codebase.
+# E702: compact one-line argparse/helper setup is intentional in the CLIs.
+ignore = ["E741", "E702"]

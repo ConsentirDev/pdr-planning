@@ -36,9 +36,8 @@ evolution using this very harness as the fitness function).
 
 from __future__ import annotations
 
-import itertools
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .pdr import PDR
 from .parallel import PSPDR
