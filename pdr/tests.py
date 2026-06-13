@@ -228,6 +228,21 @@ def test_fondpdr_finds_and_validates_policies():
               f"by {r.stats['decided_by']}), policy validated")
 
 
+def test_fondpdr_matches_oracle_across_sizes():
+    # Regression: FOND-PDR's no-policy detection must agree with the explicit
+    # reachable-graph oracle at EVERY size (a 2-block case once slipped through
+    # the forward-push heuristic).
+    cases = [clumsy_blocksworld(2), clumsy_blocksworld(3), clumsy_blocksworld(4),
+             escher_blocksworld(2), escher_blocksworld(3)]
+    for prob in cases:
+        truth, _ = reference_answer(prob)
+        r = FONDPDR(prob, time_limit=60).solve()
+        assert r.has_policy == truth, (prob.name, r.has_policy, truth)
+        if r.has_policy:
+            assert validate_policy(prob, r.policy), prob.name
+    print(f"  ok: FOND-PDR matches the oracle on {len(cases)} instances (n=2..4)")
+
+
 def test_fondpdr_proves_no_policy():
     for prob in [escher_blocksworld(3), escher_blocksworld(4)]:
         truth, _ = reference_answer(prob)

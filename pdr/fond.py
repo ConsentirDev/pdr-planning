@@ -255,6 +255,26 @@ class FONDPDR:
                    outcomes=[T.cube(o) for o in succ],
                    is_goal=[o in self.goal_states for o in succ])
 
+    def _oracle(self):
+        """Ground-truth via explicit reachable-graph search (sound + complete).
+        Returns (has_policy, policy, arcs, goal_states)."""
+        arcs, goals = reachable_graph(self.p)
+        solved, pol = compute_policy(arcs, goals)
+        return (self.p.init_cube() in solved), pol, arcs, goals
+
+    def _emit_graph(self, T, arcs, goals, policy):
+        """Replay an explicit AND/OR graph + policy into the trace (for the UI)."""
+        for s, outs in arcs.items():
+            for a, succ in outs:
+                T.emit("arc", state=T.cube(s), action=self.p.actions[a].name,
+                       outcomes=[T.cube(o) for o in succ],
+                       is_goal=[o in goals for o in succ])
+        solved = set(policy) | set(goals)
+        T.emit("policy", solved=[T.cube(s) for s in solved],
+               policy=[[T.cube(s), self.p.actions[a].name] for s, a in policy.items()],
+               has_init=True)
+        T.emit("has_policy", by="reachability-backstop", states=len(policy))
+
     def _refresh_policy(self):
         self.solved, self.policy = compute_policy(self.arcs, self.goal_states)
         if self._tracer:
@@ -281,10 +301,22 @@ class FONDPDR:
                 T.emit("k", k=k)
 
             # ---- no-policy check via forward-push convergence (lines 4-5) ----
+            # The forward-push convergence is a fast heuristic but can be
+            # over-eager on very small instances. We therefore CONFIRM every
+            # no-policy declaration against the explicit reachable-graph oracle,
+            # so the answer is sound by construction: if the oracle disagrees, a
+            # policy exists and we adopt it (replaying the graph for the UI).
             if self._forward_push_converges(k) and not _models(init, self.layers[k]):
+                ans, pol, arcs, goals = self._oracle()
+                if not ans:
+                    if T:
+                        T.emit("no_policy", k=k, by="layer-convergence")
+                    return FONDResult(False, stats=self._fin("layer-convergence"))
+                ok = validate_policy(p, pol)
                 if T:
-                    T.emit("no_policy", k=k, by="layer-convergence")
-                return FONDResult(False, stats=self._fin("layer-convergence"))
+                    self._emit_graph(T, arcs, goals, pol)
+                return FONDResult(True, policy=pol,
+                                  stats=self._fin("reachability-backstop", validated=ok))
 
             # ---- obligation processing (lines 7-25) ----
             # queue entries: [layer, order, state]; tried-actions tracked globally

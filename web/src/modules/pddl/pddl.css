@@ -1,0 +1,90 @@
+/* PDDL Loader — blueprint editor + results. Matches the Explorer aesthetic. */
+.pddl { display: flex; flex-direction: column; gap: 14px; height: 100%; overflow: auto; }
+
+/* explainer / learn */
+.pddl-explain { padding: 14px 16px; }
+.pddl-explain h2 { font-size: 20px; margin-bottom: 6px; }
+.pddl-explain p { margin: 6px 0 0; color: var(--tx-2); font-size: 13px; line-height: 1.7; max-width: 760px; }
+.pddl-explain .hl { color: var(--cyan); font-family: var(--font-mono); }
+.pddl-explain code { font-family: var(--font-mono); color: var(--amber); font-size: 12px; }
+
+/* sample buttons row */
+.pddl-samples { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; }
+.pddl-samples .eyebrow { margin-right: 4px; }
+.pddl-sample-btn { display: flex; align-items: center; gap: 8px; }
+.pddl-sample-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* editors */
+.pddl-editors { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pddl-pane { display: flex; flex-direction: column; min-height: 0; }
+.pddl-pane .panel-h { gap: 8px; }
+.pddl-pane-tag { display: flex; align-items: center; gap: 8px; }
+.pddl-ta {
+  width: 100%;
+  min-height: 280px;
+  resize: vertical;
+  border: none;
+  outline: none;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 23px, var(--line-soft) 23px 24px),
+    linear-gradient(180deg, rgba(11,16,24,0.5), rgba(8,11,17,0.5));
+  color: var(--tx);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 24px;
+  padding: 8px 14px;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.pddl-ta:focus { box-shadow: inset 0 0 0 1px var(--cyan-dim); }
+.pddl-ta::placeholder { color: var(--tx-3); }
+
+/* run row */
+.pddl-runrow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pddl-mode-chip { display: flex; align-items: center; gap: 6px; }
+.pddl-run { margin-left: auto; }
+
+/* error panel */
+.pddl-err { padding: 12px 14px; }
+.pddl-err .panel-h { border-color: rgba(255,110,138,0.3); }
+.pddl-err-title { color: var(--rose); }
+.pddl-err pre {
+  margin: 10px 0 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+  color: #ffb3c2; white-space: pre-wrap; word-break: break-word;
+}
+
+/* classical result */
+.pddl-result { display: flex; flex-direction: column; gap: 14px; }
+.pddl-resbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 14px; }
+.pddl-stat { display: flex; flex-direction: column; gap: 1px; }
+.pddl-stat b { font-size: 16px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pddl-main { display: grid; grid-template-columns: 1fr 320px; gap: 14px; min-height: 0; }
+.pddl-fences { display: flex; flex-direction: column; min-height: 0; }
+.pddl-fences-body { flex: 1; overflow: auto; padding: 8px 12px; max-height: 420px; }
+.pddl-side { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.pddl-world { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.pddl-world > :last-child { flex: 1; overflow: auto; }
+
+/* FOND summary */
+.pddl-fond { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.pddl-fond-verdict { display: flex; align-items: center; gap: 12px; }
+.pddl-fond-badge {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em;
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line);
+}
+.pddl-fond-badge.yes { color: var(--mint); border-color: var(--mint); box-shadow: var(--glow-mint); }
+.pddl-fond-badge.no { color: var(--rose); border-color: var(--rose); }
+.pddl-fond-stats { display: flex; gap: 22px; flex-wrap: wrap; }
+.pddl-fond-note { color: var(--tx-2); font-size: 13px; line-height: 1.6; }
+.pddl-fond-note .hl { color: var(--violet); font-family: var(--font-mono); }
+
+/* lab raw stats */
+.pddl-lab { padding: 12px 14px; }
+.pddl-lab-grid { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 8px; }
+.pddl-copy { margin-top: 10px; }
+
+@media (max-width: 980px) {
+  .pddl-editors { grid-template-columns: 1fr; }
+  .pddl-main { grid-template-columns: 1fr; }
+}
