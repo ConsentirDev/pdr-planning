@@ -65,7 +65,7 @@ class Result:
 class PDR:
     def __init__(self, problem: Problem, variant="baseline", F=1,
                  use_reschedule=True, use_clause_pushing=True,
-                 prefer_pysat=True, max_k=10_000, time_limit=None):
+                 prefer_pysat=True, max_k=10_000, time_limit=None, tracer=None):
         assert variant in ("baseline", "M", "IL")
         if variant == "baseline":
             F = 1
@@ -78,6 +78,7 @@ class PDR:
         self.max_k = max_k
         self.time_limit = time_limit
         self._deadline = None
+        self._tracer = tracer   # optional; non-invasive event sink (see trace.py)
 
         # layers[i] = set of clauses (each clause = frozenset of abstract lits).
         # Invariant: layers[0] >= layers[1] >= ... (more clauses = tighter/lower).
@@ -210,6 +211,8 @@ class PDR:
                 neg_c = frozenset(-l for l in c)   # cube = negation of clause
                 if not self._timed_solve(q, neg_c, 0):
                     self.layers[i].add(c)
+                    if self._tracer:
+                        self._tracer.emit("push", layer=i, clause=self._tracer.cube(c))
 
     def _converged(self, k):
         """Unsolvable iff `need` consecutive layers are identical."""
@@ -260,14 +263,19 @@ class PDR:
 
         # Line 2: trivially solved if the initial state already satisfies L_0.
         if self._state_models_layer(init, self.layers[0]):
+            if self._tracer:
+                self._tracer.emit("plan", plan=[], steps=0, trivial=True)
             return Result(True, plan=[], plan_actions=[], stats=self._final_stats(0))
 
         order = [0]  # monotonic counter for "most recently added" tie-break
 
+        T = self._tracer
         for k in range(1, self.max_k + 1):
             self.stats["k"] = k
             self._k = k
             self._ensure_layers(k)
+            if T:
+                T.emit("k", k=k)
             # Q holds entries [layer_index, order, state]; present set dedupes.
             Q = []
             present = set()
@@ -298,16 +306,25 @@ class PDR:
             while Q:
                 self._check_deadline()
                 s, i = pop_obl()
+                if T:
+                    T.emit("pop", state=T.cube(s), layer=i, qsize=len(Q) + 1)
                 kind, payload = self._progress(s, i)
 
                 if kind == "sat":
                     for t, j, seq in payload:
                         if t not in self.parent and t != init:
                             self.parent[t] = (s, seq)
+                        if T:
+                            T.emit("progress", state=T.cube(s), layer=i,
+                                   successor=T.cube(t), succ_layer=j,
+                                   actions=[self._names([a])[0] for a in seq] if seq else [])
                         if j == 0:
                             # Goal reached -> extract and validate a plan.
                             plan = self._reconstruct(t)
                             ok = plan is not None and validate_plan(p, plan)
+                            if T:
+                                T.emit("plan", plan=self._names(plan) if plan else [],
+                                       steps=len(plan) if plan else 0)
                             return Result(True, plan=plan,
                                           plan_actions=self._names(plan) if plan else None,
                                           stats=self._final_stats(k, validated=ok))
@@ -316,8 +333,13 @@ class PDR:
                 else:
                     reason = payload
                     self._add_reason_clause(reason, i)
+                    if T:
+                        T.emit("reason", state=T.cube(s), layer=i,
+                               reason=T.cube(reason), upto=i)
                     if self.use_reschedule and i < k:
                         push_obl(s, i + 1)      # obligation rescheduling
+                        if T:
+                            T.emit("reschedule", state=T.cube(s), to_layer=i + 1)
                     # queue trimming (Lines 19-25)
                     new_entries = []
                     new_present = set()
@@ -342,6 +364,8 @@ class PDR:
             if self.use_clause_pushing and self.progress_strategy is None:
                 self._clause_push(k)
             if self._converged(k):
+                if T:
+                    T.emit("converged", k=k)
                 return Result(False, stats=self._final_stats(k))
 
         return Result(False, stats=self._final_stats(self.max_k, hit_max=True))

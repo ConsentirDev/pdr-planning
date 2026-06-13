@@ -1,0 +1,42 @@
+.world-empty { padding: 30px; text-align: center; }
+
+/* logistics */
+.logi { display: flex; gap: 16px; align-items: flex-end; justify-content: center; min-height: 200px; padding: 14px; }
+.logi-loc { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; max-width: 200px; }
+.logi-pad {
+  width: 100%; min-height: 130px;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  background: rgba(58, 214, 223, 0.02);
+  display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-end; padding: 10px;
+}
+.logi-loc-label { letter-spacing: 0.2em; }
+.truck {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px 8px; border-radius: var(--radius);
+  border: 1px solid var(--cyan-dim); background: rgba(58, 214, 223, 0.08);
+}
+.tok-label { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
+.truck-bed { display: flex; gap: 4px; flex-wrap: wrap; }
+.pkg {
+  font-family: var(--font-mono); font-size: 12px;
+  padding: 5px 9px; border-radius: 3px;
+  background: var(--ink-3); border: 1px solid var(--line); color: var(--tx);
+}
+.pkg.in { background: rgba(89, 242, 176, 0.1); border-color: var(--mint); color: var(--mint); padding: 3px 6px; font-size: 10px; }
+
+/* blocksworld */
+.blocks { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 14px; position: relative; }
+.bw-hand { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); text-align: center; }
+.bw-claw { margin-top: 4px; }
+.bw-floor { display: flex; gap: 22px; align-items: flex-end; min-height: 60px; }
+.bw-tower { display: flex; flex-direction: column-reverse; gap: 3px; }
+.block {
+  width: 56px; height: 40px; display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+  color: var(--tx); background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  border: 1px solid var(--cyan-dim); border-radius: 3px;
+}
+.block.held { border-color: var(--mint); box-shadow: var(--glow-mint); color: var(--mint); }
+.bw-line { width: min(420px, 90%); height: 2px; background: var(--cyan-dim); margin-top: 2px; box-shadow: var(--glow-cyan); }
+
+.generic-world { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; }

@@ -270,11 +270,13 @@ class LADG:
 # PD-PDR
 # ---------------------------------------------------------------------------
 class PDPDR:
-    def __init__(self, problem: Problem, time_limit=None, max_iters=50, verbose=False):
+    def __init__(self, problem: Problem, time_limit=None, max_iters=50, verbose=False,
+                 tracer=None):
         self.p = problem
         self.time_limit = time_limit
         self.max_iters = max_iters
         self.verbose = verbose
+        self._tracer = tracer
         self.stats = {"iterations": 0, "subproblems": [], "sat_calls": 0,
                       "sat_time": 0.0}
 
@@ -296,6 +298,13 @@ class PDPDR:
             # Delta_G: chunks holding a goal proposition, in topo order.
             delta = [c for c in order if any(g in ladg.label(c) for g in p.goal)]
             self._log(f"iter {it}: {len(ladg.chunks)} chunks, {len(delta)} subproblems")
+            if self._tracer:
+                self._tracer.emit(
+                    "iteration", iteration=it,
+                    chunks=[sorted(ladg.label(c)) for c in order],
+                    edges=[[sorted(ladg.label(u)), sorted(ladg.label(v))]
+                           for u, vs in ladg.csucc.items() for v in vs],
+                    subgoals=[sorted(ladg.label(c)) for c in delta])
 
             if len(ladg.chunks) <= 1 or len(delta) <= 1:
                 # Decomposition exhausted -> solve concrete problem directly.
@@ -322,14 +331,25 @@ class PDPDR:
                 if r.solvable is None:
                     return DResult(None, stats=self._final_stats(it, n_sub=len(subs)))
 
+            if self._tracer:
+                self._tracer.emit("subproblems", iteration=it, subproblems=[
+                    {"goal": sorted(sub.goal), "solvable": r.solvable,
+                     "plan": self._names(r.plan) if r.plan else []}
+                    for pg, sub, r in sub_results])
+
             if unsolved is not None:
                 self._merge_for_unsolvable(ladg, unsolved[1])
+                if self._tracer:
+                    self._tracer.emit("merge", iteration=it, reason="unsolvable-subproblem")
                 continue
 
             # Concatenate sub-plans and validate against the concrete problem.
             concrete_plan = self._concatenate(sub_results)
             if validate_plan(p, concrete_plan):
                 self.stats["subproblems"].append(len(subs))
+                if self._tracer:
+                    self._tracer.emit("concrete_plan", iteration=it,
+                                      plan=self._names(concrete_plan))
                 return DResult(True, plan=concrete_plan,
                                plan_actions=self._names(concrete_plan),
                                stats=self._final_stats(it, n_sub=len(subs)))
@@ -337,6 +357,9 @@ class PDPDR:
             # Glue failed: find the problematic proposition and merge chunks.
             prob_prop = self._problematic_prop(concrete_plan)
             self._log(f"  glue failed, problematic prop = {prob_prop}")
+            if self._tracer:
+                self._tracer.emit("merge", iteration=it, reason="glue-failed",
+                                  problematic=prob_prop)
             self._merge_for_problematic(ladg, prob_prop, mtx)
 
         # safety net

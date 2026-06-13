@@ -377,6 +377,46 @@ def test_reason_transfer_is_sound():
     print("  ok: reason transfer preserves answers/plans and rejects invalid reasons")
 
 
+def test_web_run_trace_all_modules():
+    import json
+    from .web import run_trace, catalog
+    specs = [
+        {"module": "pdr", "domain": "logistics", "params": {"locs": 3, "pkgs": 2}},
+        {"module": "pdr", "domain": "pddl_sample", "params": {"key": "blocksworld"}},
+        {"module": "race", "domain": "logistics", "params": {"locs": 2, "pkgs": 2}},
+        {"module": "fond", "domain": "clumsy", "params": {"blocks": 3}},
+        {"module": "fond", "domain": "escher", "params": {"blocks": 3}},
+        {"module": "decomp", "domain": "logistics", "params": {"locs": 2, "pkgs": 2}},
+        {"module": "evolve", "seam": "progression", "config": {"generations": 2}},
+    ]
+    for spec in specs:
+        out = run_trace(spec)
+        json.dumps(out)                       # must be JSON-serializable
+        assert out["module"] == spec["module"]
+        assert "runs" in out or "events" in out
+    assert set(catalog()) >= {"pddl_samples", "domains", "variants", "seams"}
+    print(f"  ok: web.run_trace produces valid JSON for all {len(specs)} module specs")
+
+
+def test_pddl_front_end():
+    from .pddl import parse_problem, SAMPLES
+    from .fond import FONDPDR, reference_answer
+    # classical samples parse, ground, solve, and yield valid plans
+    for key in ("logistics", "blocksworld"):
+        s = SAMPLES[key]
+        prob = parse_problem(s["domain"], s["problem"])
+        r = PDR(prob).solve()
+        assert r.solvable and validate_plan(prob, r.plan), key
+    # the FOND sample detects oneof, builds a FONDProblem, finds a valid policy
+    s = SAMPLES["clumsy"]
+    fp = parse_problem(s["domain"], s["problem"])
+    assert fp.max_outcomes == 2 and len(fp.actions) >= 4
+    truth, _ = reference_answer(fp)
+    res = FONDPDR(fp, time_limit=60).solve()
+    assert res.has_policy == truth and validate_policy(fp, res.policy)
+    print("  ok: PDDL front-end parses+grounds+solves classical & FOND samples")
+
+
 def test_self_authoring_features_and_frontier():
     from .selfauthor import (label_examples, author_features, find_frontier,
                              BASE_KEYS)

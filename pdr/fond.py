@@ -159,11 +159,12 @@ def reference_answer(problem: FONDProblem):
 # ---------------------------------------------------------------------------
 class FONDPDR:
     def __init__(self, problem: FONDProblem, time_limit=None, max_k=200,
-                 prefer_pysat=True):
+                 prefer_pysat=True, tracer=None):
         self.p = problem
         self.time_limit = time_limit
         self.max_k = max_k
         self.prefer_pysat = prefer_pysat
+        self._tracer = tracer
         goal = {frozenset((l,)) for l in problem.goal_cube()}
         inv = {frozenset(c) for c in problem.invariants}
         self.layers = [set(goal | inv)]      # L_0
@@ -248,9 +249,20 @@ class FONDPDR:
             if self.p.satisfies_goal(nd):
                 self.goal_states.add(ns)
         self.stats["states"] = len(self.arcs) + len(self.goal_states)
+        if self._tracer:
+            T = self._tracer
+            T.emit("arc", state=T.cube(s), action=self.p.actions[a].name,
+                   outcomes=[T.cube(o) for o in succ],
+                   is_goal=[o in self.goal_states for o in succ])
 
     def _refresh_policy(self):
         self.solved, self.policy = compute_policy(self.arcs, self.goal_states)
+        if self._tracer:
+            T = self._tracer
+            T.emit("policy", solved=[T.cube(s) for s in self.solved],
+                   policy=[[T.cube(s), self.p.actions[a].name]
+                           for s, a in self.policy.items()],
+                   has_init=self.p.init_cube() in self.solved)
         return self.p.init_cube() in self.solved
 
     def _solve(self) -> FONDResult:
@@ -261,12 +273,17 @@ class FONDPDR:
         if _models(init, self.layers[0]):
             return FONDResult(True, policy={}, stats=self._fin("trivial"))
 
+        T = self._tracer
         for k in range(1, self.max_k + 1):
             self.stats["k"] = k
             self._ensure(k)
+            if T:
+                T.emit("k", k=k)
 
             # ---- no-policy check via forward-push convergence (lines 4-5) ----
             if self._forward_push_converges(k) and not _models(init, self.layers[k]):
+                if T:
+                    T.emit("no_policy", k=k, by="layer-convergence")
                 return FONDResult(False, stats=self._fin("layer-convergence"))
 
             # ---- obligation processing (lines 7-25) ----
@@ -317,6 +334,8 @@ class FONDPDR:
                             push(ns, self._lowest_layer(ns))
                     if self._refresh_policy() and init in self.solved:
                         ok = validate_policy(p, self.policy)
+                        if T:
+                            T.emit("has_policy", by="policy-found", states=len(self.solved))
                         return FONDResult(True, policy=self.policy,
                                           stats=self._fin("policy-found", validated=ok))
                 elif kind == "exhausted":
@@ -326,6 +345,8 @@ class FONDPDR:
                 else:  # deadend: learn a reason, reschedule to a looser layer
                     reason = payload
                     self._add_reason(reason, i)
+                    if T:
+                        T.emit("reason", state=T.cube(s), layer=i, reason=T.cube(reason))
                     if i < k:
                         push(s, i + 1)
 

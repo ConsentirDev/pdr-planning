@@ -1,0 +1,71 @@
+.fences {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  overflow-x: auto;
+  padding: 8px 4px 14px;
+  min-height: 260px;
+}
+.fence {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s var(--ease);
+}
+.fence-cap { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px; }
+.fence-idx { font-size: 15px; font-weight: 600; color: var(--tx-2); }
+.fence.current .fence-idx { color: var(--cyan); text-shadow: var(--glow-cyan); }
+.fence-tag { letter-spacing: 0.12em; }
+
+.fence-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: repeating-linear-gradient(0deg, rgba(58,214,223,0.02) 0 1px, transparent 1px 14px);
+  min-height: 160px;
+}
+.fence.current .fence-col { border-color: var(--cyan-dim); box-shadow: inset 0 0 24px rgba(58,214,223,0.06); }
+
+.goal-anchor {
+  padding: 8px; border: 1px solid var(--mint); border-radius: 3px;
+  background: rgba(89, 242, 176, 0.06); margin-bottom: 4px;
+}
+.goal-anchor .eyebrow { color: var(--mint); }
+
+.reason-chip {
+  display: flex; gap: 6px; align-items: flex-start;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--amber);
+  border-radius: 3px;
+  background: rgba(255, 180, 84, 0.04);
+  font-size: 11px;
+}
+.reason-chip.flash { animation: flashAmber 0.7s var(--ease); }
+@keyframes flashAmber {
+  0% { box-shadow: var(--glow-amber); border-color: var(--amber); background: rgba(255,180,84,0.18); }
+  100% { box-shadow: none; }
+}
+.reason-x { color: var(--amber); font-size: 11px; }
+.fence-empty { padding: 8px; text-align: center; opacity: 0.5; }
+
+.facts { display: flex; flex-wrap: wrap; gap: 4px; }
+.facts.compact { gap: 3px; }
+.fact {
+  font-family: var(--font-mono); font-size: 10.5px;
+  padding: 1px 5px; border-radius: 2px;
+  background: var(--ink-3); color: var(--tx-2);
+}
+.fact.dim { opacity: 0.4; }
+
+.fence-obl {
+  padding: 7px 8px; border: 1px solid var(--cyan-dim); border-radius: 3px;
+  background: rgba(58, 214, 223, 0.05);
+}
+.fence-obl .eyebrow { color: var(--cyan); }

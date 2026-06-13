@@ -1,0 +1,60 @@
+.explorer { display: flex; flex-direction: column; gap: 14px; height: 100%; }
+
+/* controls */
+.ex-controls { padding: 12px 14px; }
+.ex-ctl-row { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.ex-field { display: flex; flex-direction: column; gap: 6px; }
+.ex-field input[type="range"] { width: 120px; }
+.ex-field .eyebrow b { color: var(--cyan); }
+.ex-run { margin-left: auto; align-self: center; }
+.ex-err { color: var(--rose); font-size: 12px; margin-top: 8px; }
+
+.ex-toggle {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 8px 10px; cursor: pointer;
+}
+.ex-toggle-dot { width: 26px; height: 14px; border-radius: 999px; background: var(--line); position: relative; transition: all 0.18s var(--ease); }
+.ex-toggle-dot::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--tx-3); transition: all 0.18s var(--ease); }
+.ex-toggle.on .ex-toggle-dot { background: var(--cyan-dim); }
+.ex-toggle.on .ex-toggle-dot::after { left: 14px; background: var(--cyan); }
+
+/* welcome */
+.ex-welcome { flex: 1; display: grid; place-items: center; text-align: center; padding: 30px; }
+.ex-welcome-glyph { font-size: 30px; letter-spacing: 8px; color: var(--cyan-dim); margin-bottom: 18px; }
+.ex-welcome h2 { font-size: 30px; margin-bottom: 12px; }
+.ex-welcome-p { max-width: 560px; color: var(--tx-2); line-height: 1.7; font-size: 14px; margin: 0 auto 18px; }
+.ex-welcome .hl { color: var(--cyan); font-family: var(--font-mono); }
+
+/* main grid */
+.ex-main { flex: 1; display: grid; grid-template-columns: 1fr 320px; gap: 14px; min-height: 0; }
+.ex-fences { display: flex; flex-direction: column; min-height: 0; }
+.ex-h-sub { font-size: 11px; color: var(--tx-3); margin-left: 8px; }
+.ex-fences-body { flex: 1; overflow: auto; padding: 8px 12px; }
+
+.ex-stats { display: flex; align-items: center; gap: 14px; }
+.ex-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.ex-stat b { font-size: 15px; }
+
+.ex-side { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.ex-world { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.ex-world > :last-child { flex: 1; overflow: auto; }
+
+.ex-narration { padding: 14px; }
+.ex-narration p { margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: var(--tx); }
+
+/* plan strip */
+.ex-plan {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--ink-1); min-height: 46px;
+}
+.ex-plan.empty { color: var(--tx-3); }
+.plan-step { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--cyan-dim); border-radius: 3px; background: rgba(58,214,223,0.05); }
+.plan-n { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--cyan); color: var(--ink); font-size: 10px; font-weight: 700; }
+.plan-acts { font-size: 11px; color: var(--tx); }
+.plan-goal { color: var(--mint); font-family: var(--font-mono); font-size: 12px; margin-left: 4px; }
+
+@media (max-width: 920px) {
+  .ex-main { grid-template-columns: 1fr; }
+}

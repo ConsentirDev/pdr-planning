@@ -229,7 +229,7 @@ def _mutate(weights, rng, scale, keys):
 
 def evolutionary_search(seam="obligation", instances=None, valid=None, generations=6,
                         pop_size=10, elite=3, scale=0.6, seed=0,
-                        time_limit=4.0, k_cap=60, archive=None, verbose=True):
+                        time_limit=4.0, k_cap=60, archive=None, verbose=True, tracer=None):
     """If `valid` is given, candidates are RANKED by validation fitness (and must
     be safe on both train and validation) -- this prevents overfitting. If `valid`
     is None it defaults to `instances` (legacy single-set behaviour)."""
@@ -264,6 +264,18 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
         if best is None or scored[0][1].fitness() < best[1].fitness():
             best = scored[0]
         history.append(best[1].sat_calls if best[1].safe else None)
+        if tracer:
+            tracer.emit("generation", gen=gen, seam=seam,
+                        baseline=baseline_ev.sat_calls,
+                        best={"name": best[0].name, "origin": best[0].origin,
+                              "sat_calls": best[1].sat_calls,
+                              "train": best[1].train_sat, "valid": best[1].valid_sat,
+                              "spec": best[0].spec if best[0].kind == "source"
+                              else {k: round(v, 3) for k, v in best[0].spec.items()}},
+                        candidates=[{"name": o.name, "origin": o.origin,
+                                     "sat_calls": e.sat_calls, "safe": e.safe}
+                                    for o, e in scored],
+                        archive=[{"name": n, "sat_calls": sc} for n, sc in archive.summary()])
         if verbose:
             b = best
             extra = (f" [train {b[1].train_sat}]" if split else "")
