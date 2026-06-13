@@ -328,7 +328,7 @@ def _extract_code(text):
             p = p.lstrip()
             if p.startswith("python"):
                 p = p[len("python"):]
-            if "def score" in p or "def key" in p:
+            if any(s in p for s in ("def score", "def key", "def depth")):
                 return p.strip()
     return text.strip()
 
@@ -443,6 +443,9 @@ def main():
     ap.add_argument("--mode", default="evolve", choices=["evolve", "llm", "meta"])
     ap.add_argument("--seam", default="obligation", choices=["obligation", "reason", "progression"])
     ap.add_argument("--generations", type=int, default=6)
+    ap.add_argument("--rounds", type=int, default=None, help="llm mode: proposal rounds")
+    ap.add_argument("--per-round", type=int, default=None, help="llm mode: candidates per round")
+    ap.add_argument("--model", default="claude-sonnet-4-6", help="llm mode: Anthropic model id")
     args = ap.parse_args()
 
     if args.mode == "meta":
@@ -452,15 +455,18 @@ def main():
     if args.mode == "llm":
         import os
         if os.environ.get("ANTHROPIC_API_KEY"):
-            print("L2 LLM-in-the-loop (live Anthropic API proposer):\n")
-            proposer = None  # llm_search builds anthropic_proposer()
+            print(f"L2 LLM-in-the-loop (live Anthropic API proposer, model={args.model}):\n")
+            proposer = anthropic_proposer(model=args.model)
+            rounds = args.rounds or 3
+            per_round = args.per_round or 3
         else:
             print("L2 LLM-in-the-loop (offline: curated Claude-authored proposals;"
                   " set ANTHROPIC_API_KEY for live generation):\n")
             proposer = curated_proposer(args.seam)
-        best, base, arc, _ = llm_search(seam=args.seam, rounds=1,
-                                        per_round=len(_CURATED.get(args.seam, [])) or 3,
-                                        proposer=proposer)
+            rounds = args.rounds or 1
+            per_round = args.per_round or (len(_CURATED.get(args.seam, [])) or 3)
+        best, base, arc, _ = llm_search(seam=args.seam, rounds=rounds,
+                                        per_round=per_round, proposer=proposer)
     else:
         print(f"L2 autonomous evolution of the '{args.seam}' operator:\n")
         best, base, arc, hist = evolutionary_search(
