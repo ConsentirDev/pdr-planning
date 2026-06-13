@@ -407,6 +407,42 @@ def test_meta_evolve_learns_high_leverage_seam():
           f"> reason={payoff['reason']:.2f}x >= obligation={payoff['obligation']:.2f}x")
 
 
+def test_meta_evolve_split_learns_on_validation():
+    # With split=True, the L3 meta-loop learns seam leverage on the larger
+    # held-out validation set -- progression should still dominate.
+    from .evolve import meta_evolve
+    archives, report, payoff = meta_evolve(meta_rounds=4, split=True, verbose=False)
+    assert payoff["progression"] >= payoff["reason"], payoff
+    assert payoff["progression"] >= payoff["obligation"], payoff
+    pb = archives["progression"].best()
+    assert pb is not None and pb[1].safe   # safe on BOTH train and validation
+    print(f"  ok: split meta-evolution (validation-ranked) progression="
+          f"{payoff['progression']:.2f}x leads")
+
+
+def test_promotion_gate():
+    from .evolve import promote_if_generalizes, test_set, train_valid_split
+    from .operators import Operator, baseline_operator, seed_operators
+
+    def names(xs):
+        return {n for n, _ in xs}
+
+    # disjointness of the three splits (train / valid / test)
+    train, valid = train_valid_split()
+    assert not (names(train) & names(valid))
+    assert not (names(test_set()) & (names(train) | names(valid)))
+    # a generalising operator is PROMOTED over fixed PDR-M; a deliberately bad
+    # one (always F=1) is REJECTED against PDR-M.
+    f3 = Operator("PDR-M(F=3)", "progression", "template", {"bias": 3.0})
+    smooth = next(o for o in seed_operators()["progression"]
+                  if o.name == "llm-discovered-smooth")
+    ok_good, evg, _ = promote_if_generalizes(smooth, reference_op=f3)
+    ok_bad, evb, _ = promote_if_generalizes(baseline_operator("progression"), reference_op=f3)
+    assert ok_good and not ok_bad, (evg.sat_calls, evb.sat_calls)
+    print(f"  ok: promotion gate promotes generaliser ({evg.sat_calls}), "
+          f"rejects F=1 ({evb.sat_calls}) vs PDR-M")
+
+
 def main():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     print(f"running {len(tests)} tests (pysat={'yes' if have_pysat() else 'no'})")

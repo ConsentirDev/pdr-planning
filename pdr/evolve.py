@@ -149,6 +149,32 @@ def train_valid_split(scale="large"):
     return train, valid
 
 
+def test_set():
+    """A THIRD instance set, disjoint from both train and validation. Used only
+    by the promotion gate -- never for selection -- so it is a true measure of
+    generalisation (train -> validation -> test, standard ML hygiene)."""
+    return build_instances([
+        ("logistics-8-3", lambda: domains.logistics(8, 3)),
+        ("logistics-6-5", lambda: domains.logistics(6, 5)),
+        ("logistics-7-5", lambda: domains.logistics(7, 5)),
+        ("blocks-7", lambda: domains.blocksworld(7)),
+    ])
+
+
+def promote_if_generalizes(operator, reference_op=None, time_limit=15.0, k_cap=90):
+    """Gate before an operator may be promoted to a seed: it must be SAFE on the
+    held-out TEST set and use no more SAT calls there than the reference operator
+    (default: the seam's baseline; for `progression` pass fixed PDR-M to demand it
+    beats the hand-designed thesis variant). Returns (promoted, ev_op, ev_ref)."""
+    test = test_set()
+    refs = reference_table(test, time_limit, k_cap)
+    reference_op = reference_op or ops.baseline_operator(operator.seam)
+    ev_op = evaluate(operator, test, refs, time_limit, k_cap)
+    ev_ref = evaluate(reference_op, test, refs, time_limit, k_cap)
+    promoted = ev_op.safe and ev_op.sat_calls <= ev_ref.sat_calls
+    return promoted, ev_op, ev_ref
+
+
 # ---------------------------------------------------------------------------
 # Pareto archive (keep diverse, safe, fast operators)
 # ---------------------------------------------------------------------------
@@ -435,7 +461,7 @@ def llm_search(seam="obligation", instances=None, valid=None, rounds=3, per_roun
 # L3 -- meta-evolution: improve the improver
 # ---------------------------------------------------------------------------
 def meta_evolve(meta_rounds=8, seed=0, seams=("obligation", "reason", "progression"),
-                verbose=True):
+                split=False, verbose=True):
     """L3 -- improve the improver. The search's OWN choices are adapted online:
 
       * SEAM SELECTION (warm-up + payoff-greedy bandit): the meta-loop learns
@@ -458,6 +484,9 @@ def meta_evolve(meta_rounds=8, seed=0, seams=("obligation", "reason", "progressi
     spent = {s: 0 for s in seams}
     last_best = {s: None for s in seams}
     report = []
+    # When split, seam leverage (payoff) is measured on a fixed, LARGER held-out
+    # validation set, so the meta-loop learns where the generalising value is.
+    split_train, split_valid = train_valid_split() if split else (None, None)
 
     for rnd in range(1, meta_rounds + 1):
         # warm up each seam once, then exploit the learned payoff (random
@@ -470,9 +499,12 @@ def meta_evolve(meta_rounds=8, seed=0, seams=("obligation", "reason", "progressi
             best_p = max(payoff.values())
             seam = rng.choice([s for s in seams if payoff[s] == best_p])
         spent[seam] += 1
-        instances = build_instances(pool[:curric])
+        if split:
+            instances, valid = split_train, split_valid
+        else:
+            instances, valid = build_instances(pool[:curric]), None
         best, base, _, _ = evolutionary_search(
-            seam=seam, instances=instances, generations=4, pop_size=8,
+            seam=seam, instances=instances, valid=valid, generations=4, pop_size=8,
             scale=scale[seam], seed=seed + rnd, time_limit=4.0,
             archive=archives[seam], verbose=False)
         speedup = base.sat_calls / max(1, best[1].sat_calls)
@@ -519,8 +551,9 @@ def main():
               f"held-out validation instances\n")
 
     if args.mode == "meta":
-        print("L3 meta-evolution (improving the improver):\n")
-        meta_evolve()
+        tag = " (seam leverage ranked on held-out validation)" if args.split else ""
+        print(f"L3 meta-evolution (improving the improver){tag}:\n")
+        meta_evolve(split=args.split)
         return
     if args.mode == "llm":
         import os
@@ -553,6 +586,17 @@ def main():
         if op.kind == "source":
             print("  --- source ---\n" + "\n".join("    " + ln for ln in op.spec.splitlines()))
         print(f"  archive: {arc.summary()}")
+
+        # promotion gate: only operators that GENERALISE to a fresh test set
+        # (disjoint from train AND validation) are worth keeping as seeds.
+        if args.split:
+            ref = (ops.Operator("PDR-M(F=3)", "progression", "template", {"bias": 3.0})
+                   if args.seam == "progression" else ops.baseline_operator(args.seam))
+            promoted, ev_op, ev_ref = promote_if_generalizes(op, reference_op=ref)
+            print("\npromotion gate (fresh held-out TEST set, disjoint from train+valid):")
+            print(f"  candidate {ev_op.sat_calls} SAT calls vs reference "
+                  f"'{ref.name}' {ev_ref.sat_calls}  ->  "
+                  f"{'PROMOTED (seed-worthy)' if promoted else 'rejected (does not generalise)'}")
 
 
 if __name__ == "__main__":
