@@ -294,6 +294,35 @@ def test_evolution_finds_safe_improvement():
               f"({base.sat_calls/max(1,ev.sat_calls):.2f}x)")
 
 
+def test_train_validation_split_selects_generalizing_operator():
+    # Ranking on a held-out validation set (the overfitting fix) must select an
+    # operator that actually generalises -- here, beating fixed PDR-M(F=3) on a
+    # FRESH test set disjoint from both train and validation.
+    from .evolve import (evolutionary_search, evaluate, reference_table,
+                         build_instances, train_valid_split, evaluate_split)
+    from .operators import baseline_operator, Operator
+    train, valid = train_valid_split()
+    # evaluate_split ranks on validation and requires safety on BOTH sets
+    rt = reference_table(train, 8.0, 80)
+    rv = reference_table(valid, 8.0, 80)
+    ev = evaluate_split(baseline_operator("progression"), train, valid, rt, rv, 8.0, 80)
+    assert ev.safe and ev.sat_calls == ev.valid_sat and ev.train_sat > 0
+    # split-ranked evolution finds an operator that beats PDR-M on a FRESH test set
+    best, base, arc, _ = evolutionary_search(
+        seam="progression", instances=train, valid=valid, generations=3, verbose=False)
+    op = best[0]
+    test = build_instances([("logistics-8-3", lambda: logistics(8, 3)),
+                            ("blocks-7", lambda: blocksworld(7))])
+    seen = {n for n, _ in train + valid}
+    assert not ({n for n, _ in test} & seen)
+    refs = reference_table(test, 12.0, 90)
+    f3 = evaluate(Operator("F3", "progression", "template", {"bias": 3.0}), test, refs, 12.0, 90)
+    chosen = evaluate(op, test, refs, 12.0, 90)
+    assert chosen.safe and chosen.sat_calls <= f3.sat_calls, (chosen.sat_calls, f3.sat_calls)
+    print(f"  ok: split-selected '{op.name}' generalises to fresh test set "
+          f"({chosen.sat_calls} <= PDR-M {f3.sat_calls} SAT calls)")
+
+
 def test_progression_beats_fixed_pdr_m():
     # The evolved adaptive look-ahead should match-or-beat fixed PDR-M (F=3).
     from .evolve import evaluate, reference_table, build_instances

@@ -65,9 +65,11 @@ def build_instances(names_builders):
 class Eval:
     coverage: int
     n: int
-    sat_calls: int
+    sat_calls: int        # the SELECTION metric (validation SAT calls when split)
     wall: float
     valid: bool
+    train_sat: int = 0    # training-set SAT calls (reporting only)
+    valid_sat: int = 0    # validation-set SAT calls (== sat_calls when split)
 
     @property
     def safe(self):
@@ -108,7 +110,43 @@ def evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
             valid = False                  # invalid plan -> unsafe
         cov += 1
         sat += res.stats["sat_calls"]
-    return Eval(cov, len(instances), sat, wall, valid)
+    return Eval(cov, len(instances), sat, wall, valid, train_sat=sat, valid_sat=sat)
+
+
+def evaluate_split(operator, train, valid, refs_t, refs_v, time_limit=4.0, k_cap=60):
+    """Evaluate on TRAIN and VALIDATION separately; the selection metric is the
+    VALIDATION SAT calls, and an operator is only `safe` if it solves+validates
+    *both* sets. This is what stops the search overfitting to the training set."""
+    et = evaluate(operator, train, refs_t, time_limit, k_cap)
+    if valid is train:                         # legacy no-split path: evaluate once
+        return et
+    ev = evaluate(operator, valid, refs_v, time_limit, k_cap)
+    return Eval(coverage=et.coverage + ev.coverage, n=et.n + ev.n,
+                sat_calls=ev.sat_calls,                 # rank on validation
+                wall=et.wall + ev.wall,
+                valid=et.valid and ev.valid,
+                train_sat=et.sat_calls, valid_sat=ev.sat_calls)
+
+
+def train_valid_split(scale="large"):
+    """Disjoint train / validation instance sets. Validation is deliberately
+    LARGER than training, so 'generalises' means 'transfers to bigger problems'."""
+    train = build_instances([
+        ("logistics-3-2", lambda: domains.logistics(3, 2)),
+        ("logistics-4-3", lambda: domains.logistics(4, 3)),
+        ("blocks-3", lambda: domains.blocksworld(3)),
+        ("blocks-4", lambda: domains.blocksworld(4)),
+        ("logistics-5-3", lambda: domains.logistics(5, 3)),
+    ])
+    valid = build_instances([
+        ("logistics-6-3", lambda: domains.logistics(6, 3)),
+        ("logistics-5-4", lambda: domains.logistics(5, 4)),
+        ("blocks-5", lambda: domains.blocksworld(5)),
+        ("blocks-6", lambda: domains.blocksworld(6)),
+        ("logistics-7-3", lambda: domains.logistics(7, 3)),
+        ("logistics-7-4", lambda: domains.logistics(7, 4)),
+    ])
+    return train, valid
 
 
 # ---------------------------------------------------------------------------
@@ -163,14 +201,23 @@ def _mutate(weights, rng, scale, keys):
     return child
 
 
-def evolutionary_search(seam="obligation", instances=None, generations=6,
+def evolutionary_search(seam="obligation", instances=None, valid=None, generations=6,
                         pop_size=10, elite=3, scale=0.6, seed=0,
                         time_limit=4.0, k_cap=60, archive=None, verbose=True):
+    """If `valid` is given, candidates are RANKED by validation fitness (and must
+    be safe on both train and validation) -- this prevents overfitting. If `valid`
+    is None it defaults to `instances` (legacy single-set behaviour)."""
     rng = random.Random(seed)
     instances = instances or build_instances(instance_pool()[:4])
+    split = valid is not None
+    valid = valid if split else instances
     refs = reference_table(instances, time_limit, k_cap)
+    refs_v = reference_table(valid, time_limit, k_cap) if split else refs
     keys = _SEAM_KEYS[seam]
     archive = archive or Archive()
+
+    def ev_of(op):
+        return evaluate_split(op, instances, valid, refs, refs_v, time_limit, k_cap)
 
     # generation 0: seeds + random
     pop = list(ops.seed_operators()[seam])
@@ -178,13 +225,13 @@ def evolutionary_search(seam="obligation", instances=None, generations=6,
         w = _random_weights(rng, keys, scale)
         pop.append(Operator(f"rand{len(pop)}", seam, "template", w, origin="random"))
 
-    baseline_ev = evaluate(ops.baseline_operator(seam), instances, refs, time_limit, k_cap)
+    baseline_ev = ev_of(ops.baseline_operator(seam))
     history = []
     best = None
     for gen in range(generations):
         scored = []
         for op in pop:
-            ev = evaluate(op, instances, refs, time_limit, k_cap)
+            ev = ev_of(op)
             scored.append((op, ev))
             archive.consider(op, ev)
         scored.sort(key=lambda x: x[1].fitness())
@@ -193,7 +240,8 @@ def evolutionary_search(seam="obligation", instances=None, generations=6,
         history.append(best[1].sat_calls if best[1].safe else None)
         if verbose:
             b = best
-            print(f"  gen {gen}: best={b[0].name:18s} sat_calls={b[1].sat_calls} "
+            extra = (f" [train {b[1].train_sat}]" if split else "")
+            print(f"  gen {gen}: best={b[0].name:18s} valid_sat={b[1].sat_calls}{extra} "
                   f"(baseline {baseline_ev.sat_calls})  scale={scale:.2f}")
         # next generation: mutate elites
         parents = [op for op, ev in scored[:elite] if ev.safe] or [scored[0][0]]
@@ -214,7 +262,8 @@ def evolutionary_search(seam="obligation", instances=None, generations=6,
 # L2 -- LLM-in-the-loop search (proposer writes operator SOURCE)
 # ---------------------------------------------------------------------------
 def build_prompt(seam, archive, baseline_ev):
-    leaderboard = "\n".join(f"  {name}: {sc} SAT calls" for name, sc in archive.summary()) or "  (empty)"
+    leaderboard = "\n".join(f"  {name}: {sc} SAT calls (held-out validation)"
+                            for name, sc in archive.summary()) or "  (empty)"
     if seam == "obligation":
         sig = ("def score(f, entry, state, ctx):\n    # higher score == popped first\n"
                "    return <float>")
@@ -245,7 +294,10 @@ Current best operators (fewer SAT calls is better):
 {leaderboard}
 baseline: {baseline_ev.sat_calls} SAT calls
 
-Propose a NEW operator that you predict will use fewer SAT calls. Return only code."""
+Scores are on a HELD-OUT validation set of *larger* problems than any you can
+tune to. Prefer a SIMPLE, smooth rule that generalises across problem sizes over
+a heavily branched one that might overfit. Propose a NEW operator you predict
+will lower the validation SAT calls. Return only code."""
 
 
 def manual_proposer(sources):
@@ -333,17 +385,27 @@ def _extract_code(text):
     return text.strip()
 
 
-def llm_search(seam="obligation", instances=None, rounds=3, per_round=3,
+def llm_search(seam="obligation", instances=None, valid=None, rounds=3, per_round=3,
                proposer=None, time_limit=4.0, k_cap=60, archive=None, verbose=True):
+    """With `valid` set, candidates are ranked/archived by VALIDATION fitness and
+    must be safe on both sets -- so the LLM is rewarded for operators that
+    *generalise*, not ones that memorise the training instances."""
     instances = instances or build_instances(instance_pool()[:4])
+    split = valid is not None
+    valid = valid if split else instances
     refs = reference_table(instances, time_limit, k_cap)
+    refs_v = reference_table(valid, time_limit, k_cap) if split else refs
     archive = archive or Archive()
-    baseline_ev = evaluate(ops.baseline_operator(seam), instances, refs, time_limit, k_cap)
+
+    def ev_of(op):
+        return evaluate_split(op, instances, valid, refs, refs_v, time_limit, k_cap)
+
+    baseline_ev = ev_of(ops.baseline_operator(seam))
     if proposer is None:
         proposer = anthropic_proposer()
     # seed the archive so the prompt has a leaderboard
     for op in ops.seed_operators()[seam]:
-        archive.consider(op, evaluate(op, instances, refs, time_limit, k_cap))
+        archive.consider(op, ev_of(op))
 
     accepted = []
     for rnd in range(rounds):
@@ -357,11 +419,12 @@ def llm_search(seam="obligation", instances=None, rounds=3, per_round=3,
                 if verbose:
                     print(f"  round {rnd}: candidate {j} failed to compile ({e})")
                 continue
-            ev = evaluate(op, instances, refs, time_limit, k_cap)
+            ev = ev_of(op)
             kept = archive.consider(op, ev)
             tag = "SAFE" if ev.safe else "REJECT(unsafe)"
             if verbose:
-                print(f"  round {rnd}.{j}: {tag} sat_calls={ev.sat_calls} "
+                extra = (f" [train {ev.train_sat}]" if split else "")
+                print(f"  round {rnd}.{j}: {tag} valid_sat={ev.sat_calls}{extra} "
                       f"(baseline {baseline_ev.sat_calls})  {'ARCHIVED' if kept else ''}")
             if ev.safe:
                 accepted.append((op, ev))
@@ -446,7 +509,14 @@ def main():
     ap.add_argument("--rounds", type=int, default=None, help="llm mode: proposal rounds")
     ap.add_argument("--per-round", type=int, default=None, help="llm mode: candidates per round")
     ap.add_argument("--model", default="claude-sonnet-4-6", help="llm mode: Anthropic model id")
+    ap.add_argument("--split", action="store_true",
+                    help="rank by held-out validation (larger instances) to avoid overfitting")
     args = ap.parse_args()
+
+    train, valid = (train_valid_split() if args.split else (None, None))
+    if args.split:
+        print(f"train/validation split ON: {len(train)} train, {len(valid)} larger "
+              f"held-out validation instances\n")
 
     if args.mode == "meta":
         print("L3 meta-evolution (improving the improver):\n")
@@ -465,19 +535,23 @@ def main():
             proposer = curated_proposer(args.seam)
             rounds = args.rounds or 1
             per_round = args.per_round or (len(_CURATED.get(args.seam, [])) or 3)
-        best, base, arc, _ = llm_search(seam=args.seam, rounds=rounds,
-                                        per_round=per_round, proposer=proposer)
+        best, base, arc, _ = llm_search(seam=args.seam, instances=train, valid=valid,
+                                        rounds=rounds, per_round=per_round, proposer=proposer)
     else:
         print(f"L2 autonomous evolution of the '{args.seam}' operator:\n")
         best, base, arc, hist = evolutionary_search(
-            seam=args.seam, generations=args.generations)
+            seam=args.seam, instances=train, valid=valid, generations=args.generations)
     if best:
         op, ev = best
+        metric = "validation SAT calls" if args.split else "SAT calls"
         print(f"\nbest discovered: {op.name} ({op.origin}, {op.kind})")
-        print(f"  SAT calls: {ev.sat_calls}  vs baseline {base.sat_calls}  "
-              f"= {base.sat_calls/max(1,ev.sat_calls):.2f}x")
+        print(f"  {metric}: {ev.sat_calls}  vs baseline {base.sat_calls}  "
+              f"= {base.sat_calls/max(1,ev.sat_calls):.2f}x"
+              + (f"   [train {ev.train_sat}]" if args.split else ""))
         if op.kind == "template":
             print(f"  weights: { {k: round(v,3) for k,v in op.spec.items() if abs(v)>1e-3} }")
+        if op.kind == "source":
+            print("  --- source ---\n" + "\n".join("    " + ln for ln in op.spec.splitlines()))
         print(f"  archive: {arc.summary()}")
 
 

@@ -139,6 +139,40 @@ goal) that on **held-out** instances beats F=1 by ≈4.3× and **fixed PDR-M (F=
 (`progression ≫ reason > obligation`), and the improver concentrates its budget
 there. Run `python3 -m pdr.evolve --mode evolve --seam progression`.
 
+### Held-out selection: catching, then fixing, overfitting. *Implemented.*
+Running the **live** LLM-in-the-loop (`claude-sonnet-4-6`) on the progression
+seam surfaced a real failure mode — and the harness caught it. The model wrote an
+elaborate multi-branch threshold operator that was *spectacular on the training
+instances* (4 SAT calls, 110×) but, on held-out instances, **generalised worse
+than fixed PDR-M** (615 vs 460): it had overfit to the four training problems.
+
+The fix is standard ML hygiene, now built into `evolve.py`: a **train /
+validation split** (`evaluate_split`, `train_valid_split`). Candidates are scored
+on training but **ranked and archived by *validation* SAT calls on a set of
+*larger* held-out problems**, and must be safe on both. The prompt is told the
+scores are held-out and to "prefer a simple, smooth rule that generalises."
+
+Re-running the live loop with the split, the model instead produced a **smooth
+distance-to-goal** operator:
+```python
+def depth(f, i, k, state, ctx):
+    distance = 0.5 * f['i_frac'] + 0.5 * (1.0 - f['goalsat'])
+    raw = 2.0 + 4.0 * distance + 0.5 * (1.0 - abs(f['ntrue'] - 0.5) * 2.0)
+    return max(2, min(7, int(round(raw))))
+```
+Under proper train / validation / **test** protocol it now *generalises*:
+
+| set | F=1 baseline | PDR-M (F=3) | LLM-discovered (split-selected) |
+|---|---:|---:|---:|
+| validation (6 larger) | 2497 | 652 | **349** (7.2×; 1.9× vs PDR-M) |
+| fresh **test** (disjoint) | 3080 | 924 | **662** (4.7×; 1.4× vs PDR-M) |
+
+So the same loop that overfit when it optimised training fitness produces a
+genuinely-generalising operator — one that beats the hand-designed thesis variant
+on instances it never saw — once it optimises *held-out* fitness. The discovered
+operator is kept as the `llm-discovered-smooth` seed. (Run it yourself:
+`python3 -m pdr.evolve --mode llm --seam progression --split`.)
+
 ### Transferred learned reasons across the curriculum. *Implemented (sound).*
 `transfer.py` harvests the dead-ends (reason clauses) PDR learns on a small
 instance, *lifts* them (ground objects → typed variables), *regrounds* onto a

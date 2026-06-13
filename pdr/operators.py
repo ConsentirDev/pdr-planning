@@ -251,5 +251,14 @@ def seed_operators():
                  "def depth(f, i, k, state, ctx):\n"
                  "    return 1 + round(4 * (1.0 - f['goalsat']))\n",
                  origin="llm-seed"),
+        # Discovered by the LIVE LLM-in-the-loop under a train/validation split
+        # (claude-sonnet-4-6). A smooth distance-to-goal rule that GENERALISES:
+        # on a fresh test set it beats baseline ~4.6x and fixed PDR-M(F=3) ~1.4x.
+        Operator("llm-discovered-smooth", "progression", "source",
+                 "def depth(f, i, k, state, ctx):\n"
+                 "    distance = 0.5 * f['i_frac'] + 0.5 * (1.0 - f['goalsat'])\n"
+                 "    raw = 2.0 + 4.0 * distance + 0.5 * (1.0 - abs(f['ntrue'] - 0.5) * 2.0)\n"
+                 "    return max(2, min(7, int(round(raw))))\n",
+                 origin="llm-discovered"),
     ]
     return {"obligation": seeds, "reason": reason_seeds, "progression": prog_seeds}
