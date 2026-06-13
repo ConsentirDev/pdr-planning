@@ -11,6 +11,11 @@ dist/
 .venv/
 venv/
 
+# secrets / local env (NEVER commit)
+.env
+.env.*
+*.key
+
 # generated artifacts
 *.csv
 pdr/bench_results.csv
