@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# generated artifacts
+*.csv
+pdr/bench_results.csv
+
+# the source thesis is an unpublished PhD dissertation under peer review --
+# we do not redistribute it. Place it here locally to regenerate context.
+Final_Thesis_*.pdf
+*.pdf
+
+# unrelated local material in this working directory
+spaceteam/
+.claude/
+
+# OS
+.DS_Store
