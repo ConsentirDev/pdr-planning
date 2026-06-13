@@ -149,6 +149,77 @@ def _ground_effect(expr, sub):
 
 
 # ---------------------------------------------------------------------------
+# static analysis helpers (predicate-typed STRIPS support + grounding pruning)
+# ---------------------------------------------------------------------------
+def _effect_preds(expr, out):
+    """Collect predicate heads that appear in an effect (=> they are fluent)."""
+    if not expr:
+        return
+    h = expr[0]
+    if h in ("and", "oneof"):
+        for e in expr[1:]:
+            _effect_preds(e, out)
+    elif h == "not":
+        _effect_preds(expr[1], out)
+    elif h != "=":
+        out.add(h)
+
+
+def _param_domains(sch, fluent_preds, static_by_pred, objs_of, all_objs):
+    """Each parameter's candidate objects, restricted by its declared :type AND
+    by any static UNARY precondition `(type ?param)`. This is what makes a real
+    predicate-typed domain ground in milliseconds instead of exploding."""
+    doms = {}
+    for p, t in sch["params"]:
+        doms[p] = set(objs_of[t]) if (t and t in objs_of) else set(all_objs)
+
+    def visit(e):
+        if not e:
+            return
+        h = e[0]
+        if h == "and":
+            for x in e[1:]:
+                visit(x)
+        elif h in ("not", "="):
+            return
+        elif h not in fluent_preds and len(e) == 2 and e[1] in doms:
+            allowed = {args[0] for args in static_by_pred.get(h, ())}
+            doms[e[1]] &= allowed
+
+    visit(sch["pre"])
+    return {p: sorted(doms[p]) for p in doms}
+
+
+def _ground_pre(expr, sub, fluent_preds, static_facts, out):
+    """Ground a precondition. Static literals act as binding FILTERS (checked
+    against the initial state) and are dropped; fluent literals are collected
+    into `out` ({name: bool}). Returns False if the binding is filtered out."""
+    if not expr:
+        return True
+    h = expr[0]
+    if h == "and":
+        return all(_ground_pre(e, sub, fluent_preds, static_facts, out) for e in expr[1:])
+    if h == "not":
+        inner = expr[1]
+        if inner[0] == "=":
+            return sub.get(inner[1], inner[1]) != sub.get(inner[2], inner[2])
+        pred, args = inner[0], _bind(inner[1:], sub)
+        nm = atom_name(pred, args)
+        if pred in fluent_preds:
+            out[nm] = False
+            return True
+        return nm not in static_facts            # static negative: must be absent
+    if h == "=":
+        return sub.get(expr[1], expr[1]) == sub.get(expr[2], expr[2])
+    pred, args = h, _bind(expr[1:], sub)
+    nm = atom_name(pred, args)
+    if pred in fluent_preds:
+        out[nm] = True
+        return True
+    return nm in static_facts                    # static positive: must hold in init
+
+
+# ---------------------------------------------------------------------------
 # domain + problem parsing
 # ---------------------------------------------------------------------------
 class _Domain:
@@ -234,37 +305,59 @@ def parse_problem(domain_text, problem_text):
 
     obj_types = _object_types(objs, dom.parent)
     objs_of = {}                                   # type -> [objects]
+    all_objs = list(obj_types)
     for o, types in obj_types.items():
         for t in types:
             objs_of.setdefault(t, []).append(o)
 
-    # ---- ground every action schema over type-respecting bindings ----
+    # ---- static analysis (crucial for real :strips/predicate-typed domains) ----
+    # A predicate is FLUENT if it appears in any action effect; otherwise STATIC
+    # (fixed by the initial state — e.g. (package ?x), (in-city ?l ?c), type
+    # predicates). Static facts prune the grounding instead of bloating it.
+    fluent_preds = set()
+    for sch in dom.actions:
+        _effect_preds(sch["eff"], fluent_preds)
+    init_set = {atom_name(a[0], a[1:]) for a in init_atoms}
+    static_facts = set()                            # ground static atom names
+    static_by_pred = {}                             # pred -> set of arg-tuples (from init)
+    for a in init_atoms:
+        pred = a[0]
+        if pred not in fluent_preds:
+            static_facts.add(atom_name(pred, a[1:]))
+            static_by_pred.setdefault(pred, set()).add(tuple(a[1:]))
+
+    # ---- ground every action schema (typed OR static-predicate-typed) ----
     ground_actions = []
     is_fond = False
     for sch in dom.actions:
         param_names = [p for p, _ in sch["params"]]
-        choices = [objs_of.get(t or "object", []) for _, t in sch["params"]]
+        # restrict each parameter's domain: by its declared :type if any, AND by
+        # any static UNARY precondition (type ?param) — this is what keeps a real
+        # logistics instance from exploding into hundreds of thousands of bindings.
+        dom_of = _param_domains(sch, fluent_preds, static_by_pred, objs_of, all_objs)
+        choices = [dom_of[p] for p in param_names]
+        if any(len(c) == 0 for c in choices):
+            continue
         for combo in product(*choices) if choices else [()]:
             sub = dict(zip(param_names, combo))
             pre = {}
-            if not _walk_literals(sch["pre"], sub, pre, True):
-                continue                           # binding filtered by (= )/(not (= ))
+            if not _ground_pre(sch["pre"], sub, fluent_preds, static_facts, pre):
+                continue                           # filtered by a static / (=) precondition
             outcomes = _ground_effect(sch["eff"], sub)
             gname = atom_name(sch["name"], list(combo))
             if len(outcomes) > 1:
                 is_fond = True
             ground_actions.append((gname, pre, outcomes))
 
-    # ---- collect propositions (atoms mentioned anywhere) ----
+    # ---- collect FLUENT propositions only (static atoms never change) ----
     props = set()
     for gname, pre, outcomes in ground_actions:
         props |= set(pre)
         for o in outcomes:
             props |= set(o)
-    init_set = {atom_name(a[0], a[1:]) for a in init_atoms}
-    props |= init_set
+    props |= {atom_name(a[0], a[1:]) for a in init_atoms if a[0] in fluent_preds}
     goal = {}
-    _walk_literals(goal_expr, {}, goal, True)
+    _ground_pre(goal_expr, {}, fluent_preds, static_facts, goal)
     props |= set(goal)
     props = sorted(props)
 
@@ -328,6 +421,44 @@ SAMPLES = {
  (:objects b0 b1 b2 - block)
  (:init (ontable b0) (ontable b1) (ontable b2) (clear b0) (clear b1) (clear b2) (handempty))
  (:goal (and (on b0 b1) (on b1 b2))))""",
+    },
+    "logistics-ipc": {
+        "label": "Logistics — IPC style (trucks + airplane + cities)",
+        "kind": "classical",
+        # The standard IPC-2000 logistics domain: untyped objects, types asserted
+        # by static predicates (package/truck/airplane/location/airport/city/
+        # in-city). Exercises the grounder's static analysis.
+        "domain": """(define (domain logistics)
+ (:requirements :strips)
+ (:predicates (package ?o) (truck ?t) (airplane ?a) (airport ?p) (location ?l)
+              (city ?c) (in-city ?l ?c) (at ?o ?l) (in ?o ?v))
+ (:action load-truck :parameters (?o ?t ?l)
+   :precondition (and (package ?o) (truck ?t) (location ?l) (at ?t ?l) (at ?o ?l))
+   :effect (and (not (at ?o ?l)) (in ?o ?t)))
+ (:action unload-truck :parameters (?o ?t ?l)
+   :precondition (and (package ?o) (truck ?t) (location ?l) (at ?t ?l) (in ?o ?t))
+   :effect (and (not (in ?o ?t)) (at ?o ?l)))
+ (:action load-airplane :parameters (?o ?a ?l)
+   :precondition (and (package ?o) (airplane ?a) (location ?l) (at ?o ?l) (at ?a ?l))
+   :effect (and (not (at ?o ?l)) (in ?o ?a)))
+ (:action unload-airplane :parameters (?o ?a ?l)
+   :precondition (and (package ?o) (airplane ?a) (location ?l) (in ?o ?a) (at ?a ?l))
+   :effect (and (not (in ?o ?a)) (at ?o ?l)))
+ (:action drive-truck :parameters (?t ?from ?to ?c)
+   :precondition (and (truck ?t) (location ?from) (location ?to) (city ?c)
+                      (at ?t ?from) (in-city ?from ?c) (in-city ?to ?c))
+   :effect (and (not (at ?t ?from)) (at ?t ?to)))
+ (:action fly-airplane :parameters (?a ?from ?to)
+   :precondition (and (airplane ?a) (airport ?from) (airport ?to) (at ?a ?from))
+   :effect (and (not (at ?a ?from)) (at ?a ?to))))""",
+        "problem": """(define (problem logistics-mini) (:domain logistics)
+ (:objects c1 c2 pos1 apt1 pos2 apt2 t1 t2 a1 p1 p2)
+ (:init (city c1) (city c2) (location pos1) (location apt1) (location pos2)
+        (location apt2) (airport apt1) (airport apt2)
+        (truck t1) (truck t2) (airplane a1) (package p1) (package p2)
+        (in-city pos1 c1) (in-city apt1 c1) (in-city pos2 c2) (in-city apt2 c2)
+        (at t1 pos1) (at t2 pos2) (at a1 apt1) (at p1 pos1) (at p2 pos1))
+ (:goal (and (at p1 pos2) (at p2 apt2))))""",
     },
     "clumsy": {
         "label": "Clumsy Blocksworld (FOND)",

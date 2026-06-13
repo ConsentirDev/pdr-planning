@@ -422,6 +422,16 @@ def test_pddl_front_end():
         prob = parse_problem(s["domain"], s["problem"])
         r = PDR(prob).solve()
         assert r.solvable and validate_plan(prob, r.plan), key
+    # predicate-typed STRIPS (IPC style): static analysis must prune the grounding
+    # (untyped params -> would explode without it) AND still solve correctly.
+    s = SAMPLES["logistics-ipc"]
+    prob = parse_problem(s["domain"], s["problem"])
+    assert len(prob.actions) < 200, ("static grounding should stay small", len(prob.actions))
+    static = {"package", "truck", "city", "in-city", "location", "airport", "airplane"}
+    assert all(p.split("(")[0] not in static for p in prob.props), \
+        "static predicates must be pruned from the fluent props"
+    r = PDR(prob, variant="M", F=2).solve()
+    assert r.solvable and validate_plan(prob, r.plan), "IPC-style logistics"
     # the FOND sample detects oneof, builds a FONDProblem, finds a valid policy
     s = SAMPLES["clumsy"]
     fp = parse_problem(s["domain"], s["problem"])
