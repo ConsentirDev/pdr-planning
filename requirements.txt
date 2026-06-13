@@ -1,0 +1,9 @@
+# Core runtime needs NOTHING -- the toolkit runs on the pure-Python SAT fallback.
+#
+# Recommended (10-100x faster SAT, used automatically if present):
+python-sat>=0.1.8
+#
+# Optional extras (install as needed):
+#   anthropic>=0.39    # live LLM-in-the-loop operator proposer (pdr.evolve --mode llm)
+#   pytest>=7          # test runner
+#   ruff>=0.4          # linter

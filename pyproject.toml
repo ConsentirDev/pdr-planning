@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdr-planning"
+version = "0.1.0"
+description = "Property Directed Reachability for classical & FOND planning, with a recursive self-improvement stack (operator evolution, LLM-in-the-loop, meta-evolution)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Jordan" }]
+keywords = ["planning", "PDR", "IC3", "SAT", "FOND", "model-checking",
+            "self-improvement", "program-synthesis", "AlphaEvolve", "FunSearch"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []   # runs with zero deps (pure-Python SAT fallback)
+
+[project.optional-dependencies]
+sat = ["python-sat>=0.1.8"]        # fast incremental SAT backend (recommended)
+llm = ["anthropic>=0.39"]          # live LLM-in-the-loop operator proposer (L2)
+dev = ["pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+pdr = "pdr.__main__:main"
+
+[project.urls]
+Homepage = "https://example.org/pdr-planning"
+
+[tool.setuptools]
+packages = ["pdr"]
+
+[tool.pytest.ini_options]
+addopts = "-q --import-mode=importlib"
+python_files = ["tests.py"]
+testpaths = ["pdr"]
+markers = ["slow: longer-running evolutionary/meta tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the underlying thesis."
+title: "pdr-planning: a runnable reproduction of PDR for classical & FOND planning with recursive self-improvement"
+version: 0.1.0
+date-released: 2026-06-13
+authors:
+  - given-names: Jordan
+    affiliation: "Intrinsic Solutions"
+license: MIT
+keywords:
+  - automated planning
+  - property directed reachability
+  - IC3
+  - FOND planning
+  - recursive self-improvement
+references:
+  - type: thesis
+    title: "Advancing Property Directed Reachability for Classical and Fully Observable Nondeterministic Planning"
+    authors:
+      - given-names: Ava
+        family-names: Clifton
+    institution:
+      name: "The Australian National University"
+    year: 2025
+    thesis-type: "PhD thesis"
+  - type: article
+    title: "Property directed reachability for planning revisited"
+    authors:
+      - given-names: Ava
+        family-names: Clifton
+      - given-names: Charles
+        family-names: Gretton
+    collection-title: "Proceedings of KR 2023"
+    year: 2023
+    start: 156
+    end: 166

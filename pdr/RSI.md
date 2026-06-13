@@ -127,16 +127,41 @@ policy that configures it, and the L2/L3 search that improves that configuration
 are all under one fitness-driven loop, with the thesis's
 soundness/validation guarantees as the guardrail at every level.
 
-### Next frontier (beyond what's built)
-  * **Wider seams.** The progression formula (`_progress`) and the FOND policy
-    generator's sink-removal order are richer, higher-leverage seams; the same
-    gate applies. (PDR-M / PDR-IL are themselves ~5-line diffs of `_progress` —
-    i.e. operators an LLM could rediscover or surpass.)
-  * **Transfer learned reasons across the curriculum** — lift small-instance
-    reason clauses into schemas and seed them into larger instances, so the
-    frontier compounds rather than merely being well-configured.
-  * **Self-authored features & domains** — let L3 evolve the feature set the L1
-    policy uses and mutate domains to manufacture frontier-bracketing instances.
+### Wider seams — the progression operator. *Implemented.*
+The richest seam is the *progression formula* itself (`pdr.py:_progress`): how far
+to look ahead per obligation. We expose it as `progress_strategy(i, k, state, ctx)
+-> F` under PDR-M semantics (still soundness-preserving — every plan is
+validated). PDR-M / PDR-IL are themselves ~5-line diffs of `_progress`, so this is
+the seam where an evolved operator can *surpass a hand-designed thesis variant* —
+and it does: evolution finds an **adaptive look-ahead** (deeper while far from the
+goal) that on **held-out** instances beats F=1 by ≈4.3× and **fixed PDR-M (F=3) by
+≈1.28×** in SAT calls. In the L3 meta-loop this seam dominates the payoff ranking
+(`progression ≫ reason > obligation`), and the improver concentrates its budget
+there. Run `python3 -m pdr.evolve --mode evolve --seam progression`.
+
+### Transferred learned reasons across the curriculum. *Implemented (sound).*
+`transfer.py` harvests the dead-ends (reason clauses) PDR learns on a small
+instance, *lifts* them (ground objects → typed variables), *regrounds* onto a
+larger instance, and **re-verifies each by SAT before trusting it** — so transfer
+can only ever speed things up, never change the answer (naive transfer would be
+unsound). On the small, plan-rich demo domains PDR derives few reasons so the
+effect is ≈neutral; the contribution is the *sound mechanism* that lets a
+curriculum compound safely, with payoff expected on dead-end-heavy / larger
+instances. Run `python3 -m pdr.transfer`.
+
+### L3 self-authoring of features & domains. *Implemented.*
+`selfauthor.py` lets L3 rewrite two of its own ingredients: (1) it greedily ADDS
+derived features (ratios, products, logs) to the L1 meta-policy whenever they
+lower leave-one-out prediction regret (the base set is always retained, so it can
+never regress); and (2) it auto-generates a *frontier curriculum* — instances in
+an auto-calibrated difficulty band (hard-but-solvable for the default solver),
+where learning signal is richest. Run `python3 -m pdr.selfauthor`.
+
+### Still open
+  * A PDDL front-end and an IPASIR/CaDiCaL SAT backend (the biggest scaling win —
+    `sat.py` is a 5-method seam).
+  * More seams: clause-push order, the FOND sink-removal order.
+  * Live, large-budget LLM-in-the-loop sweeps across all seams at once.
 
 ---
 

@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (with fast SAT backend)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[sat,dev]"
+
+      - name: Correctness suite (every chapter + RSI L0-L3)
+        run: python -m pdr.tests
+
+      - name: Verify the pure-Python SAT fallback (zero-dependency path)
+        run: |
+          pip uninstall -y python-sat
+          python -m pdr.tests
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check pdr || true   # advisory, non-blocking
