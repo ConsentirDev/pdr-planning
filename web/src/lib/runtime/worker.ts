@@ -18,8 +18,10 @@ async function init(wheelUrl: string) {
   await pyodide.loadPackage("micropip");
   const micropip = pyodide.pyimport("micropip");
   await micropip.install(wheelUrl);
-  // warm the import so the first real run is fast
-  pyodide.runPython("import pdr.web as _w");
+  // warm the import so the first real run is fast.
+  // NB: `import pdr.web` binds the top-level name `pdr` (so `pdr.web.x` resolves);
+  // `import pdr.web as _w` would bind only `_w` and leave `pdr` undefined.
+  pyodide.runPython("import pdr.web");
   post({ type: "ready" });
 }
 
