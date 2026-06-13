@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from pdr.web import run_trace, catalog
+from pdr.sat import pysat_solver_name, have_pysat
 
 app = FastAPI(title="PDR visualized — backend", version="0.1.0")
 app.add_middleware(
@@ -40,7 +41,8 @@ class Spec(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "backend": "python-sat"}
+    return {"ok": True,
+            "engine": pysat_solver_name() if have_pysat() else "pure-python"}
 
 
 @app.get("/catalog")

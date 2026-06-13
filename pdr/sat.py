@@ -30,11 +30,29 @@ from __future__ import annotations
 import sys
 
 try:  # pragma: no cover - exercised by whichever backend exists
-    from pysat.solvers import Minisat22 as _Minisat22  # type: ignore
+    from pysat.solvers import Solver as _PySolver  # type: ignore
 
     _HAVE_PYSAT = True
 except Exception:  # pragma: no cover
     _HAVE_PYSAT = False
+
+# The CDCL engine the fast backend uses. Chosen by BENCHMARK on this PDR workload
+# (many small assumption-based incremental re-solves) on real IPC logistics, not
+# by reputation: Lingeling won — ~1.5x faster and ~half the SAT calls of
+# minisat/glucose/cadical on logistics-10-0, and the most efficient on the harder
+# -15. Its heavier inprocessing makes each solve more informative, so PDR needs
+# fewer iterations overall (it's also the engine the thesis used). Override for
+# any pysat engine via set_pysat_solver("cadical195" / "glucose42" / …).
+_PYSAT_NAME = "lingeling"
+
+
+def set_pysat_solver(name: str) -> None:
+    global _PYSAT_NAME
+    _PYSAT_NAME = name
+
+
+def pysat_solver_name() -> str:
+    return _PYSAT_NAME
 
 
 class _BaseSolver:
@@ -60,8 +78,9 @@ class _BaseSolver:
 class PySatSolver(_BaseSolver):
     backend = "pysat"
 
-    def __init__(self):
-        self._s = _Minisat22()
+    def __init__(self, name=None):
+        self.backend = name or _PYSAT_NAME      # report the engine in stats
+        self._s = _PySolver(name=name or _PYSAT_NAME)
         self._nvars = 0
         self._model = set()
 

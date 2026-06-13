@@ -11,13 +11,33 @@ reason minimisation control flow) is cheap by comparison.
 
 Consequences for scaling:
 - **The SAT backend is the lever.** `sat.py` is a thin abstraction (`new_var`,
-  `add_clause`, `solve(assumptions)`, `model`). Swapping the pure-Python DPLL or
-  `python-sat` for an industrial incremental solver (Lingeling/CaDiCaL via
-  IPASIR, as the thesis uses) is a one-class change and is the single biggest
-  scaling win. Nothing else in the toolkit needs to change.
-- **Fitness uses SAT *calls*, not wall time** (see `evolve.py`). This is
-  deterministic and solver-independent, so operator-evolution results transfer
-  across backends and machines — important for reproducible peer review.
+  `add_clause`, `solve(assumptions)`, `model`), and `python-sat` already bundles
+  every serious engine (CaDiCaL 1.x–3.0, Lingeling, Glucose, Kissat, MergeSat).
+  Picking the right one is a one-line change (`set_pysat_solver(name)`); the rest
+  of the toolkit is untouched.
+- **The default fast engine is Lingeling — chosen by benchmark, not reputation**
+  (`scripts/bench_backends.py`). PDR fires *many small assumption-based
+  incremental* SAT calls, so the engine that scales hardest here is the one whose
+  heavier inprocessing reduces the *number* of PDR iterations, not the one with
+  the best one-shot competition score. On a real IPC logistics-10-0, Lingeling
+  was ~1.5× faster (13.8s) and used ~half the SAT calls (6.7k vs 12–14k) of
+  minisat/glucose/cadical; it was also the most efficient on the harder -15.
+  (Kissat is excluded: it doesn't support assumptions, so it returns *wrong*
+  answers on this incremental workload — a good reminder to verify, not assume.)
+- **SAT-call counts are ENGINE-RELATIVE — so the fitness engine is pinned.** A
+  stronger solver can reorder which operator looks best (under Lingeling, the
+  evolved look-ahead's edge over fixed PDR-M shrinks, because better learning
+  makes the heuristic matter less). Operator *fitness* (`evolve.py`) is therefore
+  always measured under one pinned engine (`FITNESS_ENGINE = "minisat22"`),
+  decoupled from the fast *solving* default — so evolution stays reproducible
+  while solving stays fast. This is itself a finding worth stating in a paper:
+  self-improvement results are relative to the underlying engine.
+- **Where the wall actually is.** Even with the best engine, `logistics-15`
+  (~2250 ground actions, scattered goals) exceeds 200s — the bottleneck there is
+  the *encoding/search*, not the engine. The next wins are algorithmic: a
+  reachability/landmark-pruned grounder, the thesis's ∃-step encoding, and
+  Madagascar-style preprocessing (the thesis got much further than this pipeline
+  precisely because of those, on top of Lingeling).
 
 ## Architectural seams (extension points)
 - **SAT backend** — `sat.make_solver()`; add a class implementing the 5-method

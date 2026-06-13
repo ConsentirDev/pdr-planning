@@ -88,7 +88,38 @@ def reference_table(instances, time_limit, k_cap):
     return refs
 
 
+# Fitness uses SAT-call counts, which are ENGINE-RELATIVE (a stronger solver can
+# reorder which operator looks best). So operator fitness is always measured under
+# one pinned, deterministic engine — independent of the fast solving default
+# (Lingeling) — to keep evolution reproducible. (No-op in the browser, where only
+# the pure-Python solver exists.)
+FITNESS_ENGINE = "minisat22"
+
+
+def _pin_fitness_engine():
+    import pdr.sat as _sat
+    if not _sat.have_pysat():
+        return None
+    prev = _sat.pysat_solver_name()
+    _sat.set_pysat_solver(FITNESS_ENGINE)
+    return prev
+
+
+def _restore_engine(prev):
+    if prev is not None:
+        import pdr.sat as _sat
+        _sat.set_pysat_solver(prev)
+
+
 def evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
+    _prev = _pin_fitness_engine()
+    try:
+        return _evaluate(operator, instances, refs, time_limit, k_cap)
+    finally:
+        _restore_engine(_prev)
+
+
+def _evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
     cov = sat = 0
     wall = 0.0
     valid = True
