@@ -8,6 +8,7 @@ import { useMode } from "../../app/App";
 import { deriveExplorer } from "./derive";
 import { Fences } from "./Fences";
 import { WorldView } from "./WorldView";
+import { HeroDemo } from "./HeroDemo";
 import "./explorer.css";
 
 type Domain = "logistics" | "blocksworld";
@@ -62,11 +63,11 @@ export default function Explorer() {
           </Field>
           {domain === "logistics" ? (
             <>
-              <Slider label="locations" v={locs} set={setLocs} min={2} max={6} />
-              <Slider label="packages" v={pkgs} set={setPkgs} min={1} max={4} />
+              <Slider label="locations" v={locs} set={setLocs} min={2} max={8} />
+              <Slider label="packages" v={pkgs} set={setPkgs} min={1} max={6} />
             </>
           ) : (
-            <Slider label="blocks" v={blocks} set={setBlocks} min={2} max={5} />
+            <Slider label="blocks" v={blocks} set={setBlocks} min={2} max={7} />
           )}
           {mode === "lab" && (
             <>
@@ -125,18 +126,28 @@ export default function Explorer() {
 function Welcome({ mode, busy }: { mode: string; busy: boolean }) {
   return (
     <div className="ex-welcome">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="ex-welcome-glyph">▣ ▢ ▢ ◍</div>
-        <h2>Watch a planner think.</h2>
-        <p className="ex-welcome-p">
-          PDR reasons <em>backward</em> from the goal. It keeps nested fences —
-          {" "}<span className="hl">L0</span> is the goal, <span className="hl">L1</span> is one move away —
-          and learns from every dead end. {mode === "learn"
-            ? "Pick a world and press run; I'll narrate each step."
-            : "Configure the solver and press run."}
-        </p>
-        <p className="eyebrow">{busy ? "booting python in your browser…" : "press ▶ run above"}</p>
-      </motion.div>
+      <div className="ex-hero">
+        <div className="ex-hero-copy">
+          <motion.div className="kicker rise" >property directed reachability</motion.div>
+          <motion.h1 className="display ex-hero-title rise-2">
+            Watch a planner<br />think.
+          </motion.h1>
+          <motion.p className="ex-welcome-p rise-3">
+            PDR reasons <em>backward</em> from the goal, keeping nested fences —
+            {" "}<span className="hl">L0</span> is the goal, <span className="hl">L1</span> is one
+            move away — and <span className="hl-amber">learning from every dead end</span> until
+            a path appears, or it proves none can.
+          </motion.p>
+          <motion.div className="ex-hero-cta rise-3">
+            <span className="chip">{mode === "learn" ? "◐ Learn mode — narrated" : "◑ Lab mode — full control"}</span>
+            <span className="ex-hero-go">{busy ? "booting Python in your browser…" : "pick a world, press ▶ run"}</span>
+          </motion.div>
+        </div>
+        <motion.div className="ex-hero-viz" initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.1 }}>
+          <HeroDemo />
+        </motion.div>
+      </div>
     </div>
   );
 }

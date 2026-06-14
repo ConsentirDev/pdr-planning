@@ -30,6 +30,7 @@ export function App() {
   return (
     <ModeCtx.Provider value={{ mode, setMode }}>
       <div className="bp-canvas" />
+      <div className="bp-aura" />
       <div className="bp-grain" />
       <div className="shell">
         <header className="topbar">

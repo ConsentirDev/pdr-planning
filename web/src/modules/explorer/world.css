@@ -1,28 +1,41 @@
 .world-empty { padding: 30px; text-align: center; }
 
-/* logistics */
-.logi { display: flex; gap: 16px; align-items: flex-end; justify-content: center; min-height: 200px; padding: 14px; }
-.logi-loc { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; max-width: 200px; }
+/* logistics scene */
+.logi-scene { position: relative; padding: 18px 14px 26px; min-height: 220px; }
+.logi-row { display: flex; gap: 14px; align-items: flex-end; justify-content: space-around; }
+.logi-loc { display: flex; flex-direction: column; align-items: center; gap: 0; flex: 1; max-width: 220px; min-width: 84px; }
 .logi-pad {
-  width: 100%; min-height: 130px;
-  border: 1px dashed var(--line); border-radius: var(--radius);
-  background: rgba(58, 214, 223, 0.02);
-  display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-end; padding: 10px;
+  width: 100%; min-height: 116px;
+  border: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: none;
+  background: linear-gradient(180deg, rgba(58,214,223,0.03), transparent);
+  display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-end; justify-content: center; padding: 10px;
 }
-.logi-loc-label { letter-spacing: 0.2em; }
+.logi-loc.goal .logi-pad { border-color: var(--mint); background: linear-gradient(180deg, rgba(89,242,176,0.06), transparent); }
+.logi-marker { width: 100%; display: grid; place-items: center; height: 14px; }
+.logi-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cyan); box-shadow: var(--glow-cyan); transform: translateY(4px); }
+.logi-loc.goal .logi-dot { background: var(--mint); box-shadow: var(--glow-mint); }
+.logi-loc-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; color: var(--tx-2); margin-top: 6px; text-transform: uppercase; }
+.logi-loc-label.goal { color: var(--mint); }
+.logi-road {
+  position: absolute; left: 14px; right: 14px; bottom: 38px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan-dim) 12%, var(--cyan-dim) 88%, transparent);
+  box-shadow: 0 0 10px rgba(58,214,223,0.3);
+}
 .truck {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 6px 8px; border-radius: var(--radius);
-  border: 1px solid var(--cyan-dim); background: rgba(58, 214, 223, 0.08);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
-.tok-label { font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
-.truck-bed { display: flex; gap: 4px; flex-wrap: wrap; }
+.truck-svg { filter: drop-shadow(0 0 5px rgba(58,214,223,0.4)); }
+.tok-label { font-family: var(--font-mono); font-size: 10px; color: var(--cyan); }
+.truck-bed { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; max-width: 90px; }
 .pkg {
-  font-family: var(--font-mono); font-size: 12px;
-  padding: 5px 9px; border-radius: 3px;
-  background: var(--ink-3); border: 1px solid var(--line); color: var(--tx);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  padding: 6px 10px; border-radius: 4px;
+  background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  border: 1px solid var(--cyan-dim); color: var(--tx);
+  box-shadow: 0 2px 8px -4px #000;
 }
-.pkg.in { background: rgba(89, 242, 176, 0.1); border-color: var(--mint); color: var(--mint); padding: 3px 6px; font-size: 10px; }
+.pkg.in { background: rgba(89, 242, 176, 0.12); border-color: var(--mint); color: var(--mint); padding: 3px 7px; font-size: 10px; box-shadow: none; }
 
 /* blocksworld */
 .blocks { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 14px; position: relative; }

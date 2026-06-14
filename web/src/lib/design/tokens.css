@@ -74,6 +74,23 @@ body {
     radial-gradient(120% 100% at 50% -10%, rgba(58, 214, 223, 0.06), transparent 60%);
   background-size: 28px 28px, 28px 28px, 140px 140px, 140px 140px, 100% 100%;
 }
+/* slow-drifting aurora glow for depth — pure CSS, GPU-cheap */
+.bp-aura {
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 44% at 18% 22%, rgba(58, 214, 223, 0.10), transparent 70%),
+    radial-gradient(34% 40% at 84% 30%, rgba(89, 242, 176, 0.07), transparent 70%),
+    radial-gradient(46% 50% at 60% 96%, rgba(182, 156, 255, 0.06), transparent 70%);
+  filter: blur(28px);
+  animation: auraDrift 26s ease-in-out infinite alternate;
+}
+@keyframes auraDrift {
+  0% { transform: translate3d(-2%, -1%, 0) scale(1.02); opacity: 0.85; }
+  100% { transform: translate3d(3%, 2%, 0) scale(1.08); opacity: 1; }
+}
 .bp-grain {
   position: fixed;
   inset: 0;
@@ -187,4 +204,49 @@ select {
   background: repeating-linear-gradient(
     0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px);
   pointer-events: none;
+}
+
+/* ---- depth on panels: a faint top-edge highlight ---- */
+.panel { box-shadow: 0 1px 0 rgba(120, 220, 230, 0.05) inset, 0 18px 40px -28px rgba(0,0,0,0.8); }
+
+/* ---- hero / display typography ---- */
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 0.98;
+  background: linear-gradient(180deg, #eafcff, #8fcdd2 70%, #4a8f93);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+/* ---- signature motion ---- */
+@keyframes riseIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes pulseGlow { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes sweep { 0% { transform: translateY(-100%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(120%); opacity: 0; } }
+.rise { animation: riseIn 0.6s var(--ease) both; }
+.rise-2 { animation: riseIn 0.6s var(--ease) 0.08s both; }
+.rise-3 { animation: riseIn 0.6s var(--ease) 0.16s both; }
+
+/* shimmering value text (for headline numbers) */
+.shine {
+  background: linear-gradient(100deg, var(--cyan) 30%, #eafcff 50%, var(--cyan) 70%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 3.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-aura, .shine, .rise, .rise-2, .rise-3 { animation: none !important; }
 }
