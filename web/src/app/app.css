@@ -16,16 +16,21 @@
   background: linear-gradient(180deg, rgba(8, 11, 17, 0.9), rgba(8, 11, 17, 0.4));
   backdrop-filter: blur(6px);
 }
-.brand { display: flex; align-items: center; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 13px; }
 .brand-mark {
   font-family: var(--font-mono);
   color: var(--cyan);
-  font-size: 20px;
+  font-size: 22px;
   text-shadow: var(--glow-cyan);
-  letter-spacing: -2px;
+  letter-spacing: -3px;
+  animation: pulseGlow 4s ease-in-out infinite;
 }
-.brand-name { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
-.brand-dim { color: var(--tx-3); font-weight: 400; margin-left: 2px; }
+.brand-name {
+  font-size: 19px; font-weight: 700; letter-spacing: 0.03em;
+  background: linear-gradient(180deg, #eafcff, #9fd6db);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand-dim { color: var(--tx-3); font-weight: 400; margin-left: 3px; -webkit-text-fill-color: var(--tx-3); }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
 
 .runtime-badge { display: flex; align-items: center; gap: 8px; }
