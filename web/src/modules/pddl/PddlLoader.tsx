@@ -23,12 +23,15 @@ export default function PddlLoader() {
   const [trace, setTrace] = useState<Trace | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [heavy, setHeavy] = useState(false);
 
   const isFond = domainText.includes("oneof");
+  const onServer = runtime.backend === "server";
 
   function loadSample(s: PddlSample) {
     setDomainText(s.domain);
     setProblemText(s.problem);
+    setHeavy(!!s.heavy);
     setTrace(null);
     setErr(null);
   }
@@ -39,9 +42,13 @@ export default function PddlLoader() {
     setTrace(null);
     try {
       const params = { domain_text: domainText, problem_text: problemText };
+      // heavy/real instances get a far longer budget (the backend solves them in
+      // seconds; pure-Python in-browser is much slower).
+      const config = heavy ? { time_limit: 200, max_k: 90, max_events: 120000 }
+                           : { time_limit: 30, max_k: 50 };
       const t = isFond
-        ? await runtime.run({ module: "fond", domain: "pddl", params })
-        : await runtime.run({ module: "pdr", domain: "pddl", params });
+        ? await runtime.run({ module: "fond", domain: "pddl", params, config })
+        : await runtime.run({ module: "pdr", domain: "pddl", params, config });
       setTrace(t);
     } catch (e: any) {
       setErr(String(e?.message ?? e));
@@ -54,6 +61,15 @@ export default function PddlLoader() {
     <div className="pddl">
       {mode === "learn" && <Explainer isFond={isFond} />}
 
+      {heavy && !onServer && (
+        <div className="panel pddl-heavy-note">
+          <span className="chip" style={{ color: "var(--amber)", borderColor: "var(--amber)" }}>⚡ heavy</span>
+          <span>This is a real IPC instance (~1000 ground actions). In the browser
+          it runs on the pure-Python solver and can take minutes. For ~15&times; speed,
+          start the backend: <code className="mono">uvicorn server.app:app --port 8000</code> — the app auto-connects.</span>
+        </div>
+      )}
+
       <div className="panel pddl-samples">
         <span className="eyebrow">load sample</span>
         {SAMPLES.map((s) => (
@@ -61,8 +77,8 @@ export default function PddlLoader() {
             <span
               className="pddl-sample-dot"
               style={{
-                background: s.kind === "fond" ? "var(--violet)" : "var(--cyan)",
-                boxShadow: `0 0 7px ${s.kind === "fond" ? "var(--violet)" : "var(--cyan)"}`,
+                background: s.kind === "fond" ? "var(--violet)" : s.heavy ? "var(--amber)" : "var(--cyan)",
+                boxShadow: `0 0 7px ${s.kind === "fond" ? "var(--violet)" : s.heavy ? "var(--amber)" : "var(--cyan)"}`,
               }}
             />
             {s.label}
