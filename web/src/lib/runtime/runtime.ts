@@ -6,6 +6,8 @@ import PdrWorker from "./worker.ts?worker";
 import type { Spec, Trace } from "../trace/types";
 
 const BACKEND = (import.meta as any).env?.VITE_BACKEND_URL || "http://localhost:8000";
+// Optional shared token for a gated backend (set VITE_API_TOKEN on the host).
+const API_TOKEN = (import.meta as any).env?.VITE_API_TOKEN || "";
 
 type Status = "idle" | "booting" | "ready" | "error";
 type Listener = (s: Status, message?: string) => void;
@@ -66,9 +68,14 @@ class Runtime {
     await this.boot();
     if (this.backendOk) {
       const r = await fetch(`${BACKEND}/run`, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(API_TOKEN ? { "x-api-key": API_TOKEN } : {}),
+        },
         body: JSON.stringify(spec),
       });
+      if (r.status === 401) throw new Error("backend rejected the API token (401)");
       if (!r.ok) throw new Error(`backend error ${r.status}`);
       return (await r.json()) as Trace;
     }
