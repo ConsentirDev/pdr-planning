@@ -1,0 +1,20 @@
+# keep the build context tiny + never ship secrets or the thesis PDF
+web
+ipc
+.git
+.github
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.*
+*.pdf
+*.key
+dist
+build
+*.egg-info
+.pytest_cache
+.ruff_cache
+docs
+scripts
