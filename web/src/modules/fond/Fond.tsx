@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { NarrationFeed, buildBeats } from "../../lib/ui/NarrationFeed";
 import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveFond, type FondState } from "./derive";
@@ -38,13 +39,18 @@ export default function Fond() {
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
-  const player = useTracePlayer(events.length, { speed: 4, autoplay: true });
+  // Learn mode plays slowly so each narrated beat is readable; Lab runs fast.
+  const player = useTracePlayer(events.length, { speed: mode === "learn" ? 1.6 : 5, autoplay: true });
 
   const st = useMemo(
     () => (meta ? deriveFond(meta, events, player.cursor) : null),
     [meta, events, player.cursor]
   );
   const curEvent = player.cursor >= 0 ? events[player.cursor] : null;
+  const beats = useMemo(
+    () => (meta && st ? buildBeats(events, player.cursor, (ev) => narrate(meta, ev, st)) : []),
+    [meta, events, player.cursor, st]
+  );
 
   async function run() {
     setBusy(true);
@@ -108,7 +114,7 @@ export default function Fond() {
           </div>
 
           <div className="fond-side">
-            {mode === "learn" && <Narration meta={meta} ev={curEvent} st={st} />}
+            {mode === "learn" && <NarrationFeed lines={beats} accent="violet" />}
             <PolicyPanel st={st} meta={meta} mode={mode} />
           </div>
         </div>
@@ -320,29 +326,6 @@ function PolicyPanel({
         )}
       </div>
     </div>
-  );
-}
-
-function Narration({
-  meta,
-  ev,
-  st,
-}: {
-  meta: Meta;
-  ev: Ev | null;
-  st: FondState;
-}) {
-  const text = narrate(meta, ev, st);
-  return (
-    <motion.div
-      className="panel fond-narration"
-      key={st.lastKind + st.arcCount + st.policySnaps + (st.outcome ?? "")}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      <span className="eyebrow">what's happening</span>
-      <p>{text}</p>
-    </motion.div>
   );
 }
 

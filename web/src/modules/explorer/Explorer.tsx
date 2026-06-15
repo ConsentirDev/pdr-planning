@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { NarrationFeed, buildBeats } from "../../lib/ui/NarrationFeed";
 import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveExplorer } from "./derive";
@@ -30,10 +31,15 @@ export default function Explorer() {
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
-  const player = useTracePlayer(events.length, { speed: 5, autoplay: true });
+  // Learn mode plays slowly so each narrated beat is readable; Lab runs fast.
+  const player = useTracePlayer(events.length, { speed: mode === "learn" ? 1.6 : 6, autoplay: true });
   const st = useMemo(
     () => (meta ? deriveExplorer(meta, events, player.cursor) : null),
     [meta, events, player.cursor]
+  );
+  const beats = useMemo(
+    () => (meta && st ? buildBeats(events, player.cursor, (ev) => narrate(meta, ev, st)) : []),
+    [meta, events, player.cursor, st]
   );
 
   async function run() {
@@ -110,7 +116,7 @@ export default function Explorer() {
                 <div className="panel-h"><span className="eyebrow">world · state under inspection</span></div>
                 <WorldView meta={meta!} state={st?.current?.state ?? meta!.init} />
               </div>
-              {mode === "learn" && <Narration meta={meta!} ev={curEvent} st={st!} />}
+              {mode === "learn" && <NarrationFeed lines={beats} />}
             </div>
           </div>
 
@@ -166,17 +172,6 @@ function Stats({ st, result }: { st: ReturnType<typeof deriveExplorer>; result: 
 function Stat({ k, v, accent }: { k: string; v: any; accent?: string }) {
   const c = accent === "amber" ? "var(--amber)" : accent === "cyan" ? "var(--cyan)" : accent === "mint" ? "var(--mint)" : "var(--tx)";
   return <span className="ex-stat"><span className="eyebrow">{k}</span><b style={{ color: c }}>{v}</b></span>;
-}
-
-function Narration({ meta, ev, st }: { meta: Meta; ev: Ev | null; st: ReturnType<typeof deriveExplorer> }) {
-  const text = narrate(meta, ev, st);
-  return (
-    <motion.div className="panel ex-narration" key={st.lastKind + st.reasons + st.progressions}
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-      <span className="eyebrow">what's happening</span>
-      <p>{text}</p>
-    </motion.div>
-  );
 }
 
 function PlanStrip({ st }: { st: ReturnType<typeof deriveExplorer> }) {

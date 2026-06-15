@@ -1,0 +1,43 @@
+.nar-feed { padding: 14px 14px 6px; display: flex; flex-direction: column; }
+.nar-feed-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.nar-speak {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--tx-3);
+  border: 1px solid var(--line); transition: all 0.16s var(--ease);
+}
+.nar-speak:hover { color: var(--tx); border-color: var(--cyan-dim); }
+.nar-speak.on {
+  color: var(--cyan); border-color: var(--cyan-dim);
+  background: rgba(58, 214, 223, 0.1); text-shadow: var(--glow-cyan);
+}
+
+.nar-feed-body {
+  margin-top: 8px;
+  max-height: 168px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 7px;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  /* fade the older beats out at the top */
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 26px);
+          mask-image: linear-gradient(180deg, transparent, #000 26px);
+}
+.nar-feed-body::-webkit-scrollbar { width: 5px; }
+.nar-feed-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+.nar-line {
+  margin: 0; font-size: 13px; line-height: 1.55; color: var(--tx);
+  position: relative; padding-left: 16px;
+}
+.nar-line.past { color: var(--tx-2); }
+.nar-line.cur {
+  color: var(--tx); font-weight: 500;
+  border-left: 2px solid var(--cyan); margin-left: -2px; padding-left: 14px;
+}
+.nar-violet .nar-line.cur { border-left-color: var(--violet); }
+.nar-tick {
+  position: absolute; left: 0; top: 1px;
+  color: var(--cyan); font-size: 11px; animation: pulseGlow 2.4s ease-in-out infinite;
+}
+.nar-violet .nar-tick { color: var(--violet); }
+.nar-idle { color: var(--tx-3); border-left-color: var(--line); }

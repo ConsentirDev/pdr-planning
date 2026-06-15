@@ -203,7 +203,7 @@ function Editor({
 function ClassicalResultView({ trace, mode }: { trace: Trace; mode: string }) {
   const meta = trace.meta as Meta;
   const events = (trace.events ?? []) as Ev[];
-  const player = useTracePlayer(events.length, { speed: 5, autoplay: true });
+  const player = useTracePlayer(events.length, { speed: mode === "learn" ? 1.8 : 6, autoplay: true });
   const st = deriveExplorer(meta, events, player.cursor);
   const result = trace.result;
   const solvable: boolean | null = result?.solvable ?? null;
