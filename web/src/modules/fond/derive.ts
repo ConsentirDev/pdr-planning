@@ -224,8 +224,8 @@ export interface Geometry {
   arcBoxes: Map<string, { x: number; y: number }>;
 }
 
-const NODE_W = 92;
-const NODE_H = 64;
+const NODE_W = 108;
+const NODE_H = 78;
 const COL_GAP = 46;
 const ROW_GAP = 96;
 const PAD_X = 36;

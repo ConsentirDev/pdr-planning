@@ -4,10 +4,11 @@ import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
 import { NarrationFeed, buildBeats } from "../../lib/ui/NarrationFeed";
-import type { Ev, Meta, Trace } from "../../lib/trace/types";
+import type { Ev, Lit, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveFond, type FondState } from "./derive";
 import { GraphView } from "./GraphView";
+import { FondWorld } from "./FondWorld";
 import "./fond.css";
 
 type Domain = "clumsy" | "escher" | "clumsy_thesis" | "tireworld" | "faults"
@@ -58,6 +59,12 @@ export default function Fond() {
     () => (meta && st ? buildBeats(events, player.cursor, (ev) => narrate(meta, ev, st)) : []),
     [meta, events, player.cursor, st]
   );
+  // the state currently under inspection — drives the big hero world panel
+  const focusLits = useMemo<Lit[] | null>(() => {
+    if (!meta) return null;
+    const e = curEvent as { state?: Lit[] } | null;
+    return e && Array.isArray(e.state) ? e.state : meta.init;
+  }, [meta, curEvent]);
 
   async function run() {
     setBusy(true);
@@ -121,6 +128,10 @@ export default function Fond() {
           </div>
 
           <div className="fond-side">
+            <div className="panel fond-world-panel">
+              <div className="panel-h"><span className="eyebrow">world · state under inspection</span></div>
+              <FondWorld meta={meta} lits={focusLits} />
+            </div>
             {mode === "learn" && <NarrationFeed lines={beats} accent="violet" />}
             <PolicyPanel st={st} meta={meta} mode={mode} />
           </div>

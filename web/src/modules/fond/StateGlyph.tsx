@@ -49,7 +49,7 @@ function TireGlyph({ meta, lits }: { meta: Meta; lits: Lit[] }) {
     });
   });
   return (
-    <svg className="sg-tire" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
+    <svg className="sg-tire" viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
       {w.roads.map(([a, b], i) =>
         pos[a] && pos[b] ? (
           <line key={i} x1={pos[a].x} y1={pos[a].y} x2={pos[b].x} y2={pos[b].y}
@@ -125,7 +125,7 @@ function IslandsGlyph({ meta, lits }: { meta: Meta; lits: Lit[] }) {
   const w = islandsWorld(meta, lits);
   const { pos, width, height } = layeredPositions(w.layers, 40, 26);
   return (
-    <svg className="sg-isl" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
+    <svg className="sg-isl" viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
       {w.waters.map(([a, b], i) => pos[a] && pos[b] ? (
         <line key={"w" + i} x1={pos[a].x} y1={pos[a].y} x2={pos[b].x} y2={pos[b].y} className="sg-isl-water" />
       ) : null)}
@@ -152,7 +152,7 @@ function RespondersGlyph({ meta, lits }: { meta: Meta; lits: Lit[] }) {
   const w = respondersWorld(meta, lits);
   const { pos, width, height } = layeredPositions(w.layers, 46, 28);
   return (
-    <svg className="sg-fr" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
+    <svg className="sg-fr" viewBox={`0 0 ${width} ${height}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
       {w.roads.map(([a, b], i) => pos[a] && pos[b] ? (
         <line key={i} x1={pos[a].x} y1={pos[a].y} x2={pos[b].x} y2={pos[b].y} className="sg-fr-road" />
       ) : null)}
@@ -182,7 +182,7 @@ function SatelliteGlyph({ meta, lits }: { meta: Meta; lits: Lit[] }) {
   const n = Math.max(1, w.patches.length);
   const ang = (i: number) => (-Math.PI / 2) + (i * 2 * Math.PI) / n;
   return (
-    <svg className="sg-sat" viewBox={`0 0 ${S} ${S}`} width={S} height={S}>
+    <svg className="sg-sat" viewBox={`0 0 ${S} ${S}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
       <circle cx={C} cy={C} r={R} className="sg-sat-orbit" />
       <circle cx={C} cy={C} r={9} className="sg-sat-planet" />
       {w.patches.map((p, i) => {
