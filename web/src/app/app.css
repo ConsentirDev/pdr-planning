@@ -32,6 +32,13 @@
 }
 .brand-dim { color: var(--tx-3); font-weight: 400; margin-left: 3px; -webkit-text-fill-color: var(--tx-3); }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
+.ag-redo {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.03em;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--tx-3); border: 1px solid var(--line);
+  transition: all 0.16s var(--ease);
+}
+.ag-redo:hover { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(58,214,223,0.08); }
 
 .runtime-badge { display: flex; align-items: center; gap: 8px; }
 .rt-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }

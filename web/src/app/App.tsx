@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, Suspense } from "react";
 import { MODULES } from "./modules";
 import { runtime } from "../lib/runtime/runtime";
+import { AuthGate, isAdmitted } from "./AuthGate";
 import "./app.css";
 
 // ---- shared mode (Learn ⇄ Lab) ----
@@ -17,6 +18,10 @@ export function App() {
   const [{ module, mode }, setState] = useState(readHash);
   const setModule = (m: string) => setState((s) => ({ ...s, module: m }));
   const setMode = (mode: Mode) => setState((s) => ({ ...s, mode }));
+  const [admitted, setAdmitted] = useState(isAdmitted);
+
+  const admit = () => { sessionStorage.setItem("pdr-admitted-v1", "1"); setAdmitted(true); };
+  const ejectMe = () => { sessionStorage.removeItem("pdr-admitted-v1"); setAdmitted(false); };
 
   useEffect(() => {
     const h = new URLSearchParams();
@@ -26,6 +31,9 @@ export function App() {
 
   const active = MODULES.find((m) => m.id === module) ?? MODULES[0];
   const Active = active.Component;
+
+  // all hooks above run unconditionally; the gate is a plain conditional render
+  if (!admitted) return <AuthGate onAdmit={admit} />;
 
   return (
     <ModeCtx.Provider value={{ mode, setMode }}>
@@ -42,6 +50,8 @@ export function App() {
             </div>
           </div>
           <div className="topbar-right">
+            <button className="ag-redo" onClick={ejectMe}
+              title="re-run the checkpoint (you absolute masochist)">🚪 redo the bouncer</button>
             <RuntimeBadge />
             <ModeToggle mode={mode} setMode={setMode} />
           </div>
