@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
-import { NarrationFeed, buildBeats } from "../../lib/ui/NarrationFeed";
+import { NarrationFeed, buildBeats, useGuidedNarration } from "../../lib/ui/NarrationFeed";
 import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveExplorer } from "./derive";
@@ -31,8 +31,11 @@ export default function Explorer() {
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
-  // Learn mode plays slowly so each narrated beat is readable; Lab runs fast.
-  const player = useTracePlayer(events.length, { speed: mode === "learn" ? 1.6 : 6, autoplay: true });
+  // Learn mode is narration-paced (the clock is OFF; each step advances only when
+  // its beat is read/spoken). Lab mode runs on the fast clock.
+  const guided = mode === "learn";
+  const [voiceOn, setVoiceOn] = useState(false);
+  const player = useTracePlayer(events.length, { speed: 6, autoplay: true, clock: !guided });
   const st = useMemo(
     () => (meta ? deriveExplorer(meta, events, player.cursor) : null),
     [meta, events, player.cursor]
@@ -41,6 +44,11 @@ export default function Explorer() {
     () => (meta && st ? buildBeats(events, player.cursor, (ev) => narrate(meta, ev, st)) : []),
     [meta, events, player.cursor, st]
   );
+  const currentBeat = meta && st && player.cursor >= 0 ? narrate(meta, events[player.cursor], st) : null;
+  useGuidedNarration({
+    enabled: guided && player.playing, cursor: player.cursor, total: events.length,
+    text: currentBeat, voiceOn, advance: player.advance,
+  });
 
   async function run() {
     setBusy(true); setErr(null);
@@ -116,7 +124,10 @@ export default function Explorer() {
                 <div className="panel-h"><span className="eyebrow">world · state under inspection</span></div>
                 <WorldView meta={meta!} state={st?.current?.state ?? meta!.init} />
               </div>
-              {mode === "learn" && <NarrationFeed lines={beats} />}
+              {mode === "learn" && (
+                <NarrationFeed lines={beats} voiceOn={voiceOn} onToggleVoice={() => setVoiceOn((v) => !v)}
+                  narrating={player.playing} />
+              )}
             </div>
           </div>
 

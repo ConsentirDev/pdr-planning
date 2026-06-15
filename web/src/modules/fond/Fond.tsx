@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
-import { NarrationFeed, buildBeats } from "../../lib/ui/NarrationFeed";
+import { NarrationFeed, buildBeats, useGuidedNarration } from "../../lib/ui/NarrationFeed";
 import type { Ev, Lit, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveFond, type FondState } from "./derive";
@@ -47,8 +47,10 @@ export default function Fond() {
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
-  // Learn mode plays slowly so each narrated beat is readable; Lab runs fast.
-  const player = useTracePlayer(events.length, { speed: mode === "learn" ? 1.6 : 5, autoplay: true });
+  // Learn mode is narration-paced (clock off); Lab runs on the fast clock.
+  const guided = mode === "learn";
+  const [voiceOn, setVoiceOn] = useState(false);
+  const player = useTracePlayer(events.length, { speed: 5, autoplay: true, clock: !guided });
 
   const st = useMemo(
     () => (meta ? deriveFond(meta, events, player.cursor) : null),
@@ -59,6 +61,11 @@ export default function Fond() {
     () => (meta && st ? buildBeats(events, player.cursor, (ev) => narrate(meta, ev, st)) : []),
     [meta, events, player.cursor, st]
   );
+  const currentBeat = meta && st && curEvent ? narrate(meta, curEvent, st) : null;
+  useGuidedNarration({
+    enabled: guided && player.playing, cursor: player.cursor, total: events.length,
+    text: currentBeat, voiceOn, advance: player.advance,
+  });
   // the state currently under inspection — drives the big hero world panel
   const focusLits = useMemo<Lit[] | null>(() => {
     if (!meta) return null;
@@ -132,7 +139,10 @@ export default function Fond() {
               <div className="panel-h"><span className="eyebrow">world · state under inspection</span></div>
               <FondWorld meta={meta} lits={focusLits} />
             </div>
-            {mode === "learn" && <NarrationFeed lines={beats} accent="violet" />}
+            {mode === "learn" && (
+              <NarrationFeed lines={beats} accent="violet" voiceOn={voiceOn}
+                onToggleVoice={() => setVoiceOn((v) => !v)} narrating={player.playing} />
+            )}
             <PolicyPanel st={st} meta={meta} mode={mode} />
           </div>
         </div>

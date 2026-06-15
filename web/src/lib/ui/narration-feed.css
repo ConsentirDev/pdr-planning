@@ -37,7 +37,9 @@
 .nar-violet .nar-line.cur { border-left-color: var(--violet); }
 .nar-tick {
   position: absolute; left: 0; top: 1px;
-  color: var(--cyan); font-size: 11px; animation: pulseGlow 2.4s ease-in-out infinite;
+  color: var(--cyan); font-size: 11px;
 }
+.nar-tick.live { animation: narPulse 1s ease-in-out infinite; }
+@keyframes narPulse { 0%,100% { opacity: 1; transform: translateX(0); } 50% { opacity: 0.35; transform: translateX(2px); } }
 .nar-violet .nar-tick { color: var(--violet); }
 .nar-idle { color: var(--tx-3); border-left-color: var(--line); }
