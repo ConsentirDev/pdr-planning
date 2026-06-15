@@ -25,9 +25,10 @@ export interface Meta {
   init: Lit[];
   goal: Lit[];
   invariants: Lit[][];
-  render: "logistics" | "blocksworld" | "generic";
+  render: "logistics" | "blocksworld" | "tireworld" | "faults" | "generic";
   actions: ActionMeta[];
   max_outcomes?: number;
+  statics?: string[]; // ground static-atom names (e.g. road topology), if any
 }
 
 // ---- event union (the `t` discriminator matches trace.py) ----

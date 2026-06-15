@@ -390,6 +390,76 @@ def escher_blocksworld(n_blocks=3, name=None):
     return prob
 
 
+# ---------------------------------------------------------------------------
+# More FOND domains from the thesis's benchmark set (Ch 6 / FOND-SAT suite).
+# Authored as PDDL and run through the verified parser+grounder so they are the
+# *real* domains, kept small enough to solve interactively (even on the
+# pure-Python solver in the browser). The all-futures FOND encoding grows fast,
+# so these are the minimal iconic instances, not the full IPC sizes.
+# ---------------------------------------------------------------------------
+_TIREWORLD_DOMAIN = """(define (domain triangle-tireworld)
+ (:requirements :typing :strips :non-deterministic)
+ (:types location)
+ (:predicates (vehicleat ?l - location) (sparein ?l - location)
+              (road ?a - location ?b - location) (notflattire))
+ (:action drive :parameters (?from - location ?to - location)
+   :precondition (and (vehicleat ?from) (road ?from ?to) (notflattire))
+   :effect (and (vehicleat ?to) (not (vehicleat ?from))
+                (oneof (and) (not (notflattire)))))
+ (:action changetire :parameters (?l - location)
+   :precondition (and (sparein ?l) (vehicleat ?l))
+   :effect (and (not (sparein ?l)) (notflattire))))"""
+
+# A diamond: from `start` you can go via `north` or `south`, each carrying a
+# spare, to reach `goal`. Driving may blow a tire (the oneof second outcome); a
+# robust policy keeps a spare reachable. The strong-cyclic policy is the point.
+_TIREWORLD_PROBLEM = """(define (problem tireworld-diamond) (:domain triangle-tireworld)
+ (:objects start north south goal - location)
+ (:init (vehicleat start) (notflattire)
+        (road start north) (road north goal)
+        (road start south) (road south goal)
+        (sparein north) (sparein south))
+ (:goal (vehicleat goal)))"""
+
+
+def triangle_tireworld(name=None):
+    """Thesis FOND benchmark (Triangle-Tireworld): a car crosses a road network;
+    each drive may blow a tire, and only some locations carry a spare. A robust
+    (strong-cyclic) policy routes so a spare is always reachable."""
+    from .pddl import parse_problem
+    prob = parse_problem(_TIREWORLD_DOMAIN, _TIREWORLD_PROBLEM)
+    prob.name = name or "triangle-tireworld"
+    return prob
+
+
+_FAULTS_DOMAIN = """(define (domain faults)
+ (:requirements :typing :strips :non-deterministic)
+ (:types comp)
+ (:predicates (done ?c - comp) (broken ?c - comp) (poweron))
+ (:action run :parameters (?c - comp)
+   :precondition (and (poweron) (not (done ?c)) (not (broken ?c)))
+   :effect (oneof (and (done ?c)) (and (broken ?c))))
+ (:action fix :parameters (?c - comp)
+   :precondition (broken ?c)
+   :effect (not (broken ?c))))"""
+
+
+def faults(n_comp=2, name=None):
+    """Thesis FOND benchmark (Faults): each component must finish; running one
+    may instead break it, and a broken component must be fixed before it can run
+    again. A strong-cyclic policy retries through the failures."""
+    from .pddl import parse_problem
+    objs = " ".join(f"c{i + 1}" for i in range(n_comp))
+    goals = " ".join(f"(done c{i + 1})" for i in range(n_comp))
+    prob_text = (f"(define (problem faults-{n_comp}) (:domain faults)\n"
+                 f" (:objects {objs} - comp)\n"
+                 f" (:init (poweron))\n"
+                 f" (:goal (and {goals})))")
+    prob = parse_problem(_FAULTS_DOMAIN, prob_text)
+    prob.name = name or f"faults-{n_comp}"
+    return prob
+
+
 ALL_DOMAINS = {
     "logistics": logistics,
     "blocksworld": blocksworld,
@@ -398,4 +468,6 @@ ALL_DOMAINS = {
 FOND_DOMAINS = {
     "clumsy": clumsy_blocksworld,
     "escher": escher_blocksworld,
+    "tireworld": triangle_tireworld,
+    "faults": faults,
 }

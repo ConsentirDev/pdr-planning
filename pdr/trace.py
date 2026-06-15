@@ -70,6 +70,7 @@ def problem_meta(problem, kind="classical"):
         "goal": Tracer.cube(problem.goal_cube()),
         "invariants": [Tracer.cube(c) for c in getattr(problem, "invariants", [])],
         "render": _render_family(problem),
+        "statics": list(getattr(problem, "statics", [])),
     }
     if kind == "classical":
         meta["actions"] = [
@@ -99,4 +100,8 @@ def _render_family(problem):
         return "logistics"
     if {"on", "ontable", "clear"} & preds:
         return "blocksworld"
+    if "vehicleat" in preds:
+        return "tireworld"
+    if {"done", "broken"} <= preds:
+        return "faults"
     return "generic"

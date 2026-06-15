@@ -116,6 +116,32 @@
   padding: 1px 4px; border: 1px solid var(--line); border-radius: 2px;
 }
 
+/* tireworld glyph — a mini road network */
+.sg-tire { display: block; }
+.sg-tire-road { stroke: var(--cyan-dim); stroke-width: 1.4; opacity: 0.6; }
+.sg-tire-node { fill: var(--ink-3); stroke: var(--cyan-dim); stroke-width: 1.4; }
+.sg-tire-node.goal { stroke: var(--mint); stroke-width: 2; }
+.sg-tire-node.car { fill: rgba(58,214,223,0.22); stroke: var(--cyan); stroke-width: 2; filter: drop-shadow(0 0 4px var(--cyan)); }
+.sg-tire-node.car.flat { fill: rgba(245,179,90,0.22); stroke: var(--amber); filter: drop-shadow(0 0 4px var(--amber)); }
+.sg-tire-spare { fill: var(--mint); }
+.sg-tire-car { font-size: 9px; text-anchor: middle; }
+.sg-tire-flat { fill: var(--amber); font-size: 11px; text-anchor: end; }
+
+/* faults glyph — component machine tiles */
+.sg-faults { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 2px; }
+.sg-comp {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 22px; padding: 3px 5px; border-radius: 4px;
+  border: 1px solid var(--line); background: var(--ink-3);
+}
+.sg-comp-icon { font-size: 11px; line-height: 1; }
+.sg-comp-id { font-family: var(--font-mono); font-size: 8px; color: var(--tx-3); }
+.sg-comp.done { border-color: var(--mint); background: rgba(89,242,176,0.12); }
+.sg-comp.done .sg-comp-icon { color: var(--mint); }
+.sg-comp.broken { border-color: var(--amber); background: rgba(245,179,90,0.14); }
+.sg-comp.broken .sg-comp-icon { color: var(--amber); }
+.sg-comp.pending { color: var(--tx-3); }
+
 /* legend (overlay, bottom-left of graph) */
 .fond-legend {
   position: absolute; left: 10px; bottom: 8px; z-index: 4;

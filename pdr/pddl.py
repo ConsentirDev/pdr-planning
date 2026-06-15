@@ -370,6 +370,9 @@ def parse_problem(domain_text, problem_text):
     else:
         actions = [Action(gn, pre, outs[0]) for gn, pre, outs in ground_actions]
         prob = Problem(props, actions, init, goal, name=name)
+    # static facts (e.g. road topology) never change but the UI may want them to
+    # draw a faithful world — keep them around as plain ground-atom names.
+    prob.statics = sorted(static_facts)
     return prob
 
 

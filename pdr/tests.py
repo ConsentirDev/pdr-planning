@@ -228,6 +228,20 @@ def test_fondpdr_finds_and_validates_policies():
               f"by {r.stats['decided_by']}), policy validated")
 
 
+def test_fond_benchmark_domains_solve():
+    # The thesis FOND benchmark domains (Triangle-Tireworld, Faults) parse from
+    # PDDL, ground, and yield a *validated* strong-cyclic policy on the pure-Python
+    # solver (the browser path: prefer_pysat=False) — fast enough to be interactive.
+    from .domains import triangle_tireworld, faults
+    for prob in [triangle_tireworld(), faults(2)]:
+        truth, _ = reference_answer(prob)
+        r = FONDPDR(prob, time_limit=30, prefer_pysat=False).solve()
+        assert r.has_policy == truth, (prob.name, r.has_policy, truth)
+        assert r.has_policy and validate_policy(prob, r.policy), prob.name
+        print(f"  ok: FOND benchmark {prob.name} solved on pure-Python solver, "
+              f"policy validated (k={r.stats['k']})")
+
+
 def test_fondpdr_matches_oracle_across_sizes():
     # Regression: FOND-PDR's no-policy detection must agree with the explicit
     # reachable-graph oracle at EVERY size (a 2-block case once slipped through

@@ -9,13 +9,24 @@ import { deriveFond, type FondState } from "./derive";
 import { GraphView } from "./GraphView";
 import "./fond.css";
 
-type Domain = "clumsy" | "escher" | "clumsy_thesis";
+type Domain = "clumsy" | "escher" | "clumsy_thesis" | "tireworld" | "faults";
 
 const DOMAINS: { id: Domain; label: string; blurb: string; tone: string }[] = [
   { id: "clumsy", label: "Clumsy gripper", blurb: "policy exists", tone: "mint" },
+  { id: "tireworld", label: "Triangle-Tireworld", blurb: "drive around blow-outs", tone: "cyan" },
+  { id: "faults", label: "Faults", blurb: "retry through failures", tone: "cyan" },
   { id: "escher", label: "Escher", blurb: "impossible — no policy", tone: "rose" },
   { id: "clumsy_thesis", label: "Clumsy (3-block thesis)", blurb: "the thesis example", tone: "cyan" },
 ];
+
+// which domains take a size slider, and what it controls
+const SCALE: Record<Domain, { label: string; min: number; max: number } | null> = {
+  clumsy: { label: "blocks", min: 2, max: 3 },
+  escher: { label: "blocks", min: 2, max: 3 },
+  faults: { label: "components", min: 2, max: 3 },
+  clumsy_thesis: null,
+  tireworld: null,
+};
 
 export default function Fond() {
   const { mode } = useMode();
@@ -39,7 +50,7 @@ export default function Fond() {
     setBusy(true);
     setErr(null);
     try {
-      const t = await runtime.run({ module: "fond", domain, params: { blocks } });
+      const t = await runtime.run({ module: "fond", domain, params: { blocks, comps: blocks } });
       setTrace(t);
     } catch (e: any) {
       setErr(String(e?.message || e));
@@ -64,7 +75,10 @@ export default function Fond() {
               ))}
             </select>
           </Field>
-          <Slider label="blocks" v={blocks} set={setBlocks} min={2} max={3} />
+          {SCALE[domain] && (
+            <Slider label={SCALE[domain]!.label} v={blocks} set={setBlocks}
+                    min={SCALE[domain]!.min} max={SCALE[domain]!.max} />
+          )}
           <button className="btn primary fond-run" onClick={run} disabled={busy}>
             {busy ? "running…" : "▶ run"}
           </button>
