@@ -30,9 +30,13 @@ class Runtime {
   }
 
   private async _boot() {
-    this.emit("booting", "looking for a local backend…");
+    this.emit("booting", "looking for a backend…");
     try {
-      const r = await fetchTimeout(`${BACKEND}/health`, 700);
+      // Local dev fails fast to Pyodide when nothing's listening; a configured
+      // remote backend (e.g. a Fly machine) may be suspended, so give it time to
+      // wake and answer rather than falling back to the slower in-browser solver.
+      const isLocal = /localhost|127\.0\.0\.1/.test(BACKEND);
+      const r = await fetchTimeout(`${BACKEND}/health`, isLocal ? 700 : 4000);
       if (r.ok) { this.backendOk = true; this.backend = "server"; this.emit("ready", "backend connected"); return; }
     } catch { /* no backend — fall back to Pyodide */ }
 
