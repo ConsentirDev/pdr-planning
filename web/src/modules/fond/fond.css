@@ -142,6 +142,30 @@
 .sg-comp.broken .sg-comp-icon { color: var(--amber); }
 .sg-comp.pending { color: var(--tx-3); }
 
+/* islands glyph */
+.sg-isl { display: block; }
+.sg-isl-water { stroke: #4aa3d6; stroke-width: 2; stroke-dasharray: 2 2.5; opacity: 0.7; }
+.sg-isl-bridge { stroke: var(--tx-3); stroke-width: 1.6; }
+.sg-isl-land { fill: rgba(212,180,120,0.5); stroke: #c8a86a; stroke-width: 1; }
+.sg-isl-land.goal { stroke: var(--mint); stroke-width: 1.8; fill: rgba(89,242,176,0.18); }
+.sg-isl-fig { fill: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); }
+
+/* first-responders glyph */
+.sg-fr { display: block; }
+.sg-fr-road { stroke: var(--cyan-dim); stroke-width: 1.4; opacity: 0.6; }
+.sg-fr-node { fill: var(--ink-3); stroke: var(--cyan-dim); stroke-width: 1.3; }
+.sg-fr-node.medic { stroke: var(--cyan); stroke-width: 2; filter: drop-shadow(0 0 3px var(--cyan)); }
+.sg-fr-icon { font-size: 9px; text-anchor: middle; }
+.sg-fr-saved { fill: var(--mint); font-size: 10px; font-weight: 700; text-anchor: middle; }
+
+/* earth-observation (space) glyph */
+.sg-sat { display: block; }
+.sg-sat-orbit { fill: none; stroke: var(--cyan-dim); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; }
+.sg-sat-planet { fill: rgba(58,214,223,0.16); stroke: var(--cyan); stroke-width: 1.2; }
+.sg-sat-patch { fill: var(--ink-3); stroke: var(--tx-3); stroke-width: 1; }
+.sg-sat-patch.done { fill: var(--mint); stroke: var(--mint); filter: drop-shadow(0 0 3px var(--mint)); }
+.sg-sat-icon { font-size: 8px; text-anchor: middle; }
+
 /* legend (overlay, bottom-left of graph) */
 .fond-legend {
   position: absolute; left: 10px; bottom: 8px; z-index: 4;

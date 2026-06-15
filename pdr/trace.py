@@ -104,4 +104,10 @@ def _render_family(problem):
         return "tireworld"
     if {"done", "broken"} <= preds:
         return "faults"
+    if "swimmerat" in preds:
+        return "islands"
+    if "medicat" in preds:
+        return "responders"
+    if "imaged" in preds:
+        return "satellite"
     return "generic"

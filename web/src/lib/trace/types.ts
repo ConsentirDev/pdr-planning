@@ -25,7 +25,8 @@ export interface Meta {
   init: Lit[];
   goal: Lit[];
   invariants: Lit[][];
-  render: "logistics" | "blocksworld" | "tireworld" | "faults" | "generic";
+  render: "logistics" | "blocksworld" | "tireworld" | "faults"
+    | "islands" | "responders" | "satellite" | "generic";
   actions: ActionMeta[];
   max_outcomes?: number;
   statics?: string[]; // ground static-atom names (e.g. road topology), if any

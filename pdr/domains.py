@@ -460,6 +460,91 @@ def faults(n_comp=2, name=None):
     return prob
 
 
+_ISLANDS_DOMAIN = """(define (domain islands)
+ (:requirements :typing :strips :non-deterministic)
+ (:types loc)
+ (:predicates (swimmerat ?l - loc) (bridge ?a - loc ?b - loc) (water ?a - loc ?b - loc))
+ (:action walk :parameters (?a - loc ?b - loc)
+   :precondition (and (swimmerat ?a) (bridge ?a ?b))
+   :effect (and (not (swimmerat ?a)) (swimmerat ?b)))
+ (:action swim :parameters (?a - loc ?b - loc)
+   :precondition (and (swimmerat ?a) (water ?a ?b))
+   :effect (oneof (and (not (swimmerat ?a)) (swimmerat ?b)) (and))))"""
+
+_ISLANDS_PROBLEM = """(define (problem islands-hop) (:domain islands)
+ (:objects sand rock reef - loc)
+ (:init (swimmerat sand) (bridge sand rock) (water rock reef))
+ (:goal (swimmerat reef)))"""
+
+
+def islands(name=None):
+    """Thesis FOND benchmark (Islands): cross between islands. A bridge is a sure
+    step; swimming may sweep you back, so you just try again. The robust policy
+    walks where it can and re-swims where it must — strong-cyclic under fairness."""
+    from .pddl import parse_problem
+    prob = parse_problem(_ISLANDS_DOMAIN, _ISLANDS_PROBLEM)
+    prob.name = name or "islands"
+    return prob
+
+
+_RESPONDERS_DOMAIN = """(define (domain first-responders)
+ (:requirements :typing :strips :non-deterministic)
+ (:types loc)
+ (:predicates (medicat ?l - loc) (road ?a - loc ?b - loc) (fire ?l - loc)
+              (victim ?l - loc) (saved ?l - loc))
+ (:action drive :parameters (?a - loc ?b - loc)
+   :precondition (and (medicat ?a) (road ?a ?b))
+   :effect (and (not (medicat ?a)) (medicat ?b)))
+ (:action extinguish :parameters (?l - loc)
+   :precondition (and (medicat ?l) (fire ?l))
+   :effect (not (fire ?l)))
+ (:action rescue :parameters (?l - loc)
+   :precondition (and (medicat ?l) (victim ?l) (not (fire ?l)))
+   :effect (oneof (and (saved ?l)) (and))))"""
+
+_RESPONDERS_PROBLEM = """(define (problem responders-1) (:domain first-responders)
+ (:objects base scene - loc)
+ (:init (medicat base) (road base scene) (road scene base) (fire scene) (victim scene))
+ (:goal (saved scene)))"""
+
+
+def first_responders(name=None):
+    """Thesis FOND benchmark (First-Responders): drive to the emergency, put out
+    the fire, then rescue the victim — and a rescue can fail and need retrying.
+    The strong-cyclic policy keeps at it until everyone is safe."""
+    from .pddl import parse_problem
+    prob = parse_problem(_RESPONDERS_DOMAIN, _RESPONDERS_PROBLEM)
+    prob.name = name or "first-responders"
+    return prob
+
+
+_EARTHOBS_DOMAIN = """(define (domain earth-observation)
+ (:requirements :typing :strips :non-deterministic)
+ (:types patch)
+ (:predicates (over ?p - patch) (adj ?a - patch ?b - patch) (imaged ?p - patch))
+ (:action slew :parameters (?a - patch ?b - patch)
+   :precondition (and (over ?a) (adj ?a ?b))
+   :effect (and (not (over ?a)) (over ?b)))
+ (:action takeimage :parameters (?p - patch)
+   :precondition (and (over ?p) (not (imaged ?p)))
+   :effect (oneof (and (imaged ?p)) (and))))"""
+
+_EARTHOBS_PROBLEM = """(define (problem earthobs-ring) (:domain earth-observation)
+ (:objects p1 p2 p3 - patch)
+ (:init (over p1) (adj p1 p2) (adj p2 p3) (adj p3 p1))
+ (:goal (and (imaged p1) (imaged p2) (imaged p3))))"""
+
+
+def earth_observation(name=None):
+    """Thesis FOND benchmark (Earth-Observation): a satellite slews over a ring of
+    ground patches and images each one — but cloud cover can spoil a shot, so it
+    must come back around and try again. Strong-cyclic: every patch gets imaged."""
+    from .pddl import parse_problem
+    prob = parse_problem(_EARTHOBS_DOMAIN, _EARTHOBS_PROBLEM)
+    prob.name = name or "earth-observation"
+    return prob
+
+
 ALL_DOMAINS = {
     "logistics": logistics,
     "blocksworld": blocksworld,
@@ -470,4 +555,7 @@ FOND_DOMAINS = {
     "escher": escher_blocksworld,
     "tireworld": triangle_tireworld,
     "faults": faults,
+    "islands": islands,
+    "first_responders": first_responders,
+    "earthobs": earth_observation,
 }

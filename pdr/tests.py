@@ -232,8 +232,10 @@ def test_fond_benchmark_domains_solve():
     # The thesis FOND benchmark domains (Triangle-Tireworld, Faults) parse from
     # PDDL, ground, and yield a *validated* strong-cyclic policy on the pure-Python
     # solver (the browser path: prefer_pysat=False) — fast enough to be interactive.
-    from .domains import triangle_tireworld, faults
-    for prob in [triangle_tireworld(), faults(2)]:
+    from .domains import (triangle_tireworld, faults, islands,
+                          first_responders, earth_observation)
+    for prob in [triangle_tireworld(), faults(2), islands(),
+                 first_responders(), earth_observation()]:
         truth, _ = reference_answer(prob)
         r = FONDPDR(prob, time_limit=30, prefer_pysat=False).solve()
         assert r.has_policy == truth, (prob.name, r.has_policy, truth)

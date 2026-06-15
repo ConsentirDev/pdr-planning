@@ -10,11 +10,15 @@ import { deriveFond, type FondState } from "./derive";
 import { GraphView } from "./GraphView";
 import "./fond.css";
 
-type Domain = "clumsy" | "escher" | "clumsy_thesis" | "tireworld" | "faults";
+type Domain = "clumsy" | "escher" | "clumsy_thesis" | "tireworld" | "faults"
+  | "islands" | "first_responders" | "earthobs";
 
 const DOMAINS: { id: Domain; label: string; blurb: string; tone: string }[] = [
   { id: "clumsy", label: "Clumsy gripper", blurb: "policy exists", tone: "mint" },
   { id: "tireworld", label: "Triangle-Tireworld", blurb: "drive around blow-outs", tone: "cyan" },
+  { id: "earthobs", label: "Earth-Observation 🛰", blurb: "satellite images patches", tone: "cyan" },
+  { id: "islands", label: "Islands", blurb: "bridge it or swim it", tone: "cyan" },
+  { id: "first_responders", label: "First-Responders", blurb: "fire, then rescue", tone: "cyan" },
   { id: "faults", label: "Faults", blurb: "retry through failures", tone: "cyan" },
   { id: "escher", label: "Escher", blurb: "impossible — no policy", tone: "rose" },
   { id: "clumsy_thesis", label: "Clumsy (3-block thesis)", blurb: "the thesis example", tone: "cyan" },
@@ -27,6 +31,9 @@ const SCALE: Record<Domain, { label: string; min: number; max: number } | null> 
   faults: { label: "components", min: 2, max: 3 },
   clumsy_thesis: null,
   tireworld: null,
+  islands: null,
+  first_responders: null,
+  earthobs: null,
 };
 
 export default function Fond() {

@@ -16,7 +16,8 @@ from __future__ import annotations
 from .trace import Tracer, problem_meta
 from .domains import (logistics, blocksworld, fuel_logistics, clumsy_blocksworld,
                       clumsy_blocksworld_thesis, escher_blocksworld,
-                      triangle_tireworld, faults)
+                      triangle_tireworld, faults, islands, first_responders,
+                      earth_observation)
 from .pddl import parse_problem, SAMPLES
 from .planning import FONDProblem
 from .pdr import PDR
@@ -62,6 +63,12 @@ def build_problem(spec):
         return triangle_tireworld()
     if dom == "faults":
         return faults(p.get("comps", 2))
+    if dom == "islands":
+        return islands()
+    if dom == "first_responders":
+        return first_responders()
+    if dom == "earthobs":
+        return earth_observation()
     if dom == "pddl":
         return parse_problem(p["domain_text"], p["problem_text"])
     if dom == "pddl_sample":
@@ -184,7 +191,8 @@ def catalog():
                          for k, v in SAMPLES.items()},
         "domains": {
             "classical": ["logistics", "blocksworld", "fuel"],
-            "fond": ["clumsy", "clumsy_thesis", "escher", "tireworld", "faults"],
+            "fond": ["clumsy", "clumsy_thesis", "escher", "tireworld", "faults",
+                     "islands", "first_responders", "earthobs"],
         },
         "variants": ["baseline", "M", "IL"],
         "seams": ["progression", "reason", "obligation"],
