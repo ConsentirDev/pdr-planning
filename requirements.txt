@@ -1,6 +1,8 @@
 # Core runtime needs NOTHING -- the toolkit runs on the pure-Python SAT fallback.
 #
-# Recommended (10-100x faster SAT, used automatically if present):
+# Recommended (10-100x faster SAT, used automatically if present).
+# NOTE: python-sat only publishes pre-release builds, so install with --pre:
+#   pip install --pre python-sat
 python-sat>=0.1.8
 #
 # Optional extras (install as needed):
