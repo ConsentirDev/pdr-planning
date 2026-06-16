@@ -37,8 +37,7 @@ python3 -m pdr.evolve --mode meta                   # L3: improve the improver
 
 ---
 
-## Part 1 — Explain it to me like I'm 10 🧒
-
+## Part 1 — Explain it
 **Planning** = a toy world (a truck, packages, places) where you want the list of
 moves that turns the start into the goal. **PDR** is a clever way to find it: it
 thinks *backwards* from the goal using nested fences called "layers" (Layer 0 =
