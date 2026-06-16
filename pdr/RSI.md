@@ -1,65 +1,95 @@
-# Recursively self-improving PDR — design & roadmap
+# Self-improving PDR — what it is, what it shows, and what it doesn't (yet)
 
-This doc explains how to push your friend's thesis "even further" by wrapping the
-whole solver family in a **recursive self-improvement (RSI) loop**, why the
-thesis is an unusually good substrate for it, what's implemented today, and the
-ladder from here to LLM-driven algorithm discovery.
+This document describes an experimental layer built **on top of** Ava Clifton's PDR
+thesis: a fitness-driven loop that *configures*, *selects*, and ultimately
+*synthesises* PDR search heuristics, with the thesis's soundness/validation
+machinery as a verifier. It is a follow-on to the thesis, not a parallel claim.
 
----
-
-## Why PDR is a great substrate for self-improvement
-
-Three properties have to hold for self-improvement to actually compound. The
-thesis hands us all three:
-
-1. **A verifiable fitness function, for free.** Every PDR variant is *sound and
-   complete*, and every output is independently checkable — `validate_plan`
-   replays a classical plan against the real world; `validate_policy` checks a
-   FOND policy is genuinely strong-cyclic; `reference_answer` gives ground truth.
-   So a proposed improvement can never "cheat" the score: a faster-but-wrong
-   solver is caught. RSI loops die without a trustworthy fitness signal; here it
-   is mechanical.
-
-2. **A big, structured knob space where nothing dominates.** Table 3.2 / Figs
-   3.5–3.6 show PDR-M, PDR-IL, the look-ahead `F`, rescheduling, parallel
-   workers, and decomposition each win on *some* domain and lose on others. That
-   variance is not noise — it's exploitable structure tied to cheap, observable
-   problem features (size, branching, decomposability). Wherever there is
-   structure + a fitness function, a learner can climb.
-
-3. **Composable knowledge.** PDR *learns* (reasons / layer clauses); PD-PDR
-   literally *builds large solutions out of small sub-problem solutions*. So
-   solving easy instances produces artifacts that make hard instances easier —
-   the precondition for a frontier that expands rather than plateaus.
+> **On the name.** Earlier drafts called this "recursive self-improvement (RSI)."
+> That framing over-promises: RSI in the strong sense means a system that improves
+> its own *cognition*, not just its configuration. What's actually here is a
+> well-understood stack — algorithm configuration, per-instance algorithm
+> selection, and verifier-grounded program synthesis — plumbed into PDR. The file
+> keeps the `RSI.md` name for continuity; the honest description is below.
 
 ---
 
-## The ladder of self-improvement
+## TL;DR (the honest version)
 
-### L0 — Auto-tuning (self-configuration). *Implemented.*
-Treat the knobs as a search problem and the benchmark harness as fitness. For a
-given problem, *race* the configs and keep the fastest that solves
-(`search_best_config`). This already beats any fixed default, because the thesis
-showed no fixed default is good everywhere.
+The thesis spent five chapters hand-designing a family of PDR moves (PDR-M,
+PDR-IL, look-ahead `F`, rescheduling, parallelism, decomposition) and showed
+empirically that **the right move depends on the problem**. This layer turns that
+observation into a loop that *picks* the right move per problem, and — on one
+seam — *invents* a new one, under a verifier that makes a bad candidate slower but
+never wrong. The single result worth defending is the **held-out story**: a
+naïve optimiser overfit four training instances; a train/validation/test split
+caught it; and the re-run produced a *simpler* operator that genuinely
+generalised to disjoint instances. That is honest research practice and the
+strongest part of the work.
 
-### L1 — A learned meta-policy (self-configuring portfolio). *Implemented.*
-Auto-tuning per problem is expensive. Instead, learn a function
-`features(problem) → config` from the races, so a *new* problem gets a good
-config without a search. `selfimprove.MetaPolicy` is a nearest-neighbour learner
-over normalised features (`n_props`, `n_actions`, goal size, decomposability,
-action density). It is warm-started from the structurally-nearest solved
-instance — cheap knowledge transfer.
+Everything else should be read as a **prototype on small, plan-rich demo
+domains**, with the limitations in [Methodology & threats to validity](#methodology--threats-to-validity) taken seriously — not glossed.
 
-**The recursive loop (`recursive_improve`)** closes L0+L1 over a *curriculum*:
+---
 
-```
-solve current frontier with the meta-policy
-  └─ where the policy is sub-optimal, run a config search (LEARN the winner)
-       └─ teach the meta-policy, then PUSH the frontier to harder instances
-            └─ harder instances are warm-started from easier neighbours … repeat
-```
+## Positioning: this is a known stack, applied to PDR
 
-Measured outcome (run `python3 -m pdr.selfimprove`):
+Each rung below is a mature subfield. The contribution is **not** the technique;
+it is (a) wiring this stack into PDR, and (b) doing it through a
+**soundness-preserving** verifier plus a held-out generalisation criterion. Where
+this layer sits in the literature:
+
+| Here | The actual technique | Prior art it should be measured against |
+|---|---|---|
+| L0 auto-tuning | per-problem **algorithm configuration** | ParamILS, SMAC, irace |
+| L1 meta-policy | per-instance **algorithm selection** | SATzilla (2008), AutoFolio, claspfolio, Hydra |
+| L2 operator evolution | **verifier-grounded program synthesis** | FunSearch, AlphaEvolve; learning-to-branch (Khalil et al. 2016, Gasse et al. 2019) |
+| L3 meta-search | hyperparameter/curriculum adaptation | teacher–student curricula; standard meta-search |
+
+We do not benchmark against any of these yet (see threats below). Until we do, the
+defensible claim is *"we operationalised this stack inside PDR with a verifier,"*
+not *"we beat / advanced it."*
+
+---
+
+## Why PDR is a good substrate
+
+1. **A verifiable fitness signal, for free.** Every PDR variant is sound and
+   complete and every output is independently checkable — `validate_plan` replays
+   a classical plan, `validate_policy` checks a FOND policy is genuinely
+   strong-cyclic, `reference_answer` gives ground truth. So a *faster-but-wrong*
+   solver is mechanically rejected. Optimisation loops die without a trustworthy
+   fitness signal; here correctness is not part of the objective, it is a gate.
+
+2. **A structured knob space where nothing dominates.** The thesis (Table 3.2,
+   Figs 3.5–3.6) shows each variant winning on *some* domains and losing on
+   others, tied to cheap, observable features (size, branching, decomposability).
+   That exploitable variance is what an algorithm selector climbs.
+
+3. **Composable knowledge.** PDR learns reasons/layer clauses; PD-PDR builds large
+   solutions from sub-problem solutions. So easy instances can, in principle,
+   produce artifacts that make hard instances easier.
+
+---
+
+## The ladder
+
+### L0 — Algorithm configuration. *Implemented.*
+Race the configs on a problem, keep the fastest that solves (`search_best_config`).
+Beats any fixed default because — per the thesis — no fixed default is good
+everywhere. This is ParamILS/SMAC-style configuration, brute-forced (we race
+rather than model-search the space).
+
+### L1 — Per-instance algorithm selection. *Implemented (with a caveat).*
+Learn `features(problem) → config` from the races so a *new* problem gets a good
+config without searching. `selfimprove.MetaPolicy` is a **nearest-neighbour**
+learner over normalised features (`n_props`, `n_actions`, goal size,
+decomposability, action density), warm-started from the structurally-nearest
+solved instance.
+
+`recursive_improve` closes L0+L1 over a curriculum (solve with the policy →
+config-search where it's sub-optimal → teach the policy → push the frontier →
+repeat), and the measured trajectory (`python3 -m pdr.selfimprove`) is:
 
 | round | instances | capability frontier | policy regret vs oracle |
 |------:|----------:|--------------------:|------------------------:|
@@ -68,162 +98,222 @@ Measured outcome (run `python3 -m pdr.selfimprove`):
 | 3 | 7 | 6 | 1.12× |
 | 4 | 9 | 7 | 1.11× |
 
-Capability climbs while regret collapses toward 1.0× — the system gets *both*
-broader and sharper each round, and it rediscovers, on its own, the thesis's
-finding that PDR-M with large `F` is the right tool for the logistics-shaped
-instances.
+Capability climbs while regret collapses toward 1.0×, and the loop re-derives the
+thesis's finding that PDR-M with large `F` suits these logistics-shaped instances.
 
-### L2 — Algorithm/operator evolution (LLM-in-the-loop). *Implemented.*
-L0/L1 search a *fixed* knob space. The thesis's contributions (PDR-M, PDR-IL,
-PS-PDR, …) are themselves points a human invented by varying the algorithm. L2
-automates *that*: propose **new search operators as code**, scored by this repo's
-verifiable harness — FunSearch / AlphaEvolve, but grounded so it can't fake a win.
+> **Caveat (important).** Nearest-neighbour is the *weakest* defensible selector —
+> SATzilla used ridge/RF with cross-validation in 2008; AutoFolio learns selectors
+> over ASlib. A regret of 1.11× on a narrow demo distribution may say more about
+> the distribution than the learner. The honest next step is RF/AutoFolio with
+> proper CV, benchmarked head-to-head. This number is a *demonstration*, not a
+> result.
 
-**The seams (`pdr.py`).** Two of PDR's hot decision points are exposed as
-pluggable callables, chosen specifically because they are *soundness-preserving
-by construction*:
-  * `tie_breaker` — orders only the obligations that **already share the minimal
-    layer index** (the termination invariant is untouched);
-  * `reason_order` — orders which literals are tried first during reason
-    minimisation (**every** order still yields a valid reason).
-A candidate operator can therefore only ever be slower, never wrong — so the
-loop is safe to run unattended, and the safety gate cannot be cheated.
+### L2 — Verifier-grounded operator synthesis. *Implemented.*
+L0/L1 search a *fixed* knob space; L2 proposes **new search heuristics as code**,
+scored by the verifiable harness — FunSearch/AlphaEvolve in spirit, grounded so it
+can't fake a win.
 
-**Operators (`operators.py`)** come in two forms: TEMPLATE (a weight vector over
-normalised features — what the autonomous engine mutates) and SOURCE (a sandboxed
-Python function over those features — what an LLM writes).
+**The seams are soundness-preserving *by construction*** (this is the careful
+part, and it is by construction, not assertion):
+  * `tie_breaker` orders only obligations that **already share the minimal layer
+    index** — the termination invariant is literally untouched, so any order
+    terminates with the same answer;
+  * `reason_order` orders which literals are tried first during reason
+    minimisation — **every** order still yields a valid reason (minimisation only
+    drops literals whose removal preserves the unsat core);
+  * `progress_strategy` (the look-ahead `F`) — see the lemma below.
 
-**The loop (`evolve.py`):**
-```
-propose operator → SAFETY GATE (must solve & validate every instance)
-                 → FITNESS (total SAT calls; deterministic, noise-free)
-                 → Pareto ARCHIVE → feed the leaderboard back into the prompt
-```
-Two engines: `evolutionary_search` (autonomous, no LLM) and `llm_search`
-(proposer = the Anthropic API, or a manual callback so it runs offline).
+So a candidate can only ever be **slower, never wrong**, and the loop is safe to
+run unattended.
 
-**Measured (run `python3 -m pdr.evolve --mode evolve --seam reason`):** the
-search autonomously discovers a reason-ordering operator — *drop True / non-goal
-literals first, keep goal literals last* — that uses **927 vs 1128 SAT calls
-(1.22×)**, fully validated. It **generalises**: on four held-out instances it
-holds **1.19×**. (This matches the thesis's own hint that reasons denoting
-propositions *False* yield looser reasons → tighter layers.) The obligation seam,
-by contrast, shows ~1.0× here — a real finding the harness surfaced: that lever
+Operators come as TEMPLATE (a weight vector the autonomous engine mutates) or
+SOURCE (a sandboxed Python function an LLM writes). The loop: propose → **safety
+gate** (must solve & validate every instance it runs on) → **fitness** → Pareto
+archive → feed the leaderboard back into the prompt. Two engines:
+`evolutionary_search` (no LLM) and `llm_search` (Anthropic API or an offline
+callback).
+
+**Measured (`--mode evolve --seam reason`):** the search finds *drop True /
+non-goal literals first, keep goal literals last* — **927 vs 1128 SAT calls
+(1.22×)**, holding **1.19×** on four held-out instances. This is **confirmation,
+not discovery**: it re-derives the thesis's own hint (looser reasons → tighter
+layers), and is worth keeping as a sanity check that the loop finds *known-good*
+moves before we trust it on unknown ones. The obligation seam shows ~1.0× — a
+genuine null result the harness surfaced, reported rather than buried: that lever
 doesn't move these domains.
 
-### L3 — Improving the improver (meta-RSI). *Implemented.*
-The search's own choices are parameters; `meta_evolve` adapts them online:
-  * **Seam selection** (warm-up + payoff-greedy): the meta-loop *learns which
-    seam pays off* and concentrates budget there. Run
-    `python3 -m pdr.evolve --mode meta` and it discovers
-    `payoff[reason]≈1.3× ≫ payoff[obligation]≈1.0×` and spends ~5/6 rounds on the
-    reason seam — i.e. it learns *where to look*, not just what to try.
-  * **Mutation scale** shrinks on improvement (exploit), grows on stagnation.
-  * **Curriculum** auto-expands toward the frontier (3→7 instances) as the
-    current set is mastered.
+### Progression seam — operationalising Ava §7.2. *Implemented.*
+**Credit where it's due: Ava's §7.2 future work conjectures exactly this** — *"the
+macro length could be adapted online to suit the problem being solved … combined
+with PS-PDR, with each worker considering a different length macro."* We
+operationalise her conjecture via LLM-guided synthesis under a held-out
+generalisation criterion. That is the sharp, honest framing of this result — not
+"evolution invented adaptive `F`."
 
-This is where "recursive" becomes literal: the object-level planner, the L1
-policy that configures it, and the L2/L3 search that improves that configuration
-are all under one fitness-driven loop, with the thesis's
-soundness/validation guarantees as the guardrail at every level.
+The progression formula (`pdr.py:_progress`) decides how far to look ahead per
+obligation, exposed as `progress_strategy(i, k, state, ctx) -> F` under PDR-M
+semantics. Evolution finds an **adaptive look-ahead** (deeper while far from the
+goal) that on held-out instances beats F=1 by ≈4.3× and fixed PDR-M (F=3) by
+≈1.28× **in SAT calls** (read the [metric caveat](#methodology--threats-to-validity)).
 
-### Wider seams — the progression operator. *Implemented.*
-The richest seam is the *progression formula* itself (`pdr.py:_progress`): how far
-to look ahead per obligation. We expose it as `progress_strategy(i, k, state, ctx)
--> F` under PDR-M semantics (still soundness-preserving — every plan is
-validated). PDR-M / PDR-IL are themselves ~5-line diffs of `_progress`, so this is
-the seam where an evolved operator can *surpass a hand-designed thesis variant* —
-and it does: evolution finds an **adaptive look-ahead** (deeper while far from the
-goal) that on **held-out** instances beats F=1 by ≈4.3× and **fixed PDR-M (F=3) by
-≈1.28×** in SAT calls. In the L3 meta-loop this seam dominates the payoff ranking
-(`progression ≫ reason > obligation`), and the improver concentrates its budget
-there. Run `python3 -m pdr.evolve --mode evolve --seam progression`.
+> **Soundness lemma (per-state / per-call adaptive `F`).** PDR-M's soundness does
+> not depend on `F` being constant across calls. A single progression expands a
+> macro of `F` ∀-step transitions; each transition is a set of real, non-interfering
+> action applications validated against the layer invariants exactly as in the
+> fixed-`F` proof, and the macro is admitted only if every intermediate state
+> satisfies the relevant frame. Choosing `F` from `(i, k, state)` changes only
+> *how many* transitions a call expands, never *whether* an expanded transition is
+> legal. Finally the returned plan is independently replayed by `validate_plan`.
+> Hence any `progress_strategy` is sound; it can only change cost. ∎
+> (Two lines, as requested — and necessary, since this seam dominates the payoff
+> ranking.)
+
+### L3 — Meta-search over the search's own knobs. *Implemented.*
+`meta_evolve` adapts the *search's* parameters online: **seam selection**
+(warm-up then payoff-greedy — it learns `payoff[progression] ≫ payoff[reason] >
+payoff[obligation]` and spends budget there), **mutation scale** (shrink on
+improvement, grow on stagnation), and **curriculum** (auto-expand toward the
+frontier). This is standard meta-search and teacher–student curriculum learning —
+useful, not novel, and not "the system rewriting its own cognition."
 
 ### Held-out selection: catching, then fixing, overfitting. *Implemented.*
-Running the **live** LLM-in-the-loop (`claude-sonnet-4-6`) on the progression
-seam surfaced a real failure mode — and the harness caught it. The model wrote an
-elaborate multi-branch threshold operator that was *spectacular on the training
-instances* (4 SAT calls, 110×) but, on held-out instances, **generalised worse
-than fixed PDR-M** (615 vs 460): it had overfit to the four training problems.
+**This is the part worth showing a serious reader.** Running the live LLM
+(`claude-sonnet-4-6`) on the progression seam surfaced a real failure mode the
+harness caught: the model wrote an elaborate multi-branch operator that was
+spectacular on the four *training* instances (4 SAT calls) but on held-out
+instances generalised **worse than fixed PDR-M** (615 vs 460). It had overfit.
 
-The fix is standard ML hygiene, now built into `evolve.py`: a **train /
-validation split** (`evaluate_split`, `train_valid_split`). Candidates are scored
-on training but **ranked and archived by *validation* SAT calls on a set of
-*larger* held-out problems**, and must be safe on both. The prompt is told the
-scores are held-out and to "prefer a simple, smooth rule that generalises."
+The fix is standard ML hygiene, now built into `evolve.py`: a train/validation
+split (`evaluate_split`, `train_valid_split`). Candidates are scored on training
+but **ranked and archived by *validation* SAT calls on larger held-out problems**,
+and must be safe on both. Re-running with the split, the model produced a smooth
+distance-to-goal rule:
 
-Re-running the live loop with the split, the model instead produced a **smooth
-distance-to-goal** operator:
 ```python
 def depth(f, i, k, state, ctx):
     distance = 0.5 * f['i_frac'] + 0.5 * (1.0 - f['goalsat'])
     raw = 2.0 + 4.0 * distance + 0.5 * (1.0 - abs(f['ntrue'] - 0.5) * 2.0)
     return max(2, min(7, int(round(raw))))
 ```
-Under proper train / validation / **test** protocol it now *generalises*:
+
+Under train / validation / **test**:
 
 | set | F=1 baseline | PDR-M (F=3) | LLM-discovered (split-selected) |
 |---|---:|---:|---:|
-| validation (6 larger) | 2497 | 652 | **349** (7.2×; 1.9× vs PDR-M) |
-| fresh **test** (disjoint) | 3080 | 924 | **662** (4.7×; 1.4× vs PDR-M) |
+| validation (6 larger) | 2497 | 652 | **349** (7.2×; 1.9× vs PDR-M) — *SAT calls* |
+| fresh **test** (disjoint) | 3080 | 924 | **662** (4.7×; 1.4× vs PDR-M) — *SAT calls* |
 
-So the same loop that overfit when it optimised training fitness produces a
-genuinely-generalising operator — one that beats the hand-designed thesis variant
-on instances it never saw — once it optimises *held-out* fitness. The discovered
-operator is kept as the `llm-discovered-smooth` seed. (Run it yourself:
-`python3 -m pdr.evolve --mode llm --seam progression --split`.)
+The same loop that overfit when optimising *training* fitness produced a
+generalising operator once it optimised *held-out* fitness. Kept as the
+`llm-discovered-smooth` seed. (`--mode llm --seam progression --split`.)
 
-### Transferred learned reasons across the curriculum. *Implemented (sound).*
-`transfer.py` harvests the dead-ends (reason clauses) PDR learns on a small
-instance, *lifts* them (ground objects → typed variables), *regrounds* onto a
-larger instance, and **re-verifies each by SAT before trusting it** — so transfer
-can only ever speed things up, never change the answer (naive transfer would be
-unsound). On the small, plan-rich demo domains PDR derives few reasons so the
-effect is ≈neutral; the contribution is the *sound mechanism* that lets a
-curriculum compound safely, with payoff expected on dead-end-heavy / larger
-instances. Run `python3 -m pdr.transfer`.
+### Transferred learned reasons. *Implemented (sound, ≈neutral here).*
+`transfer.py` lifts the reason-clauses PDR learns on a small instance (ground →
+typed variables), regrounds them on a larger instance, and **re-verifies each by
+SAT before trusting it** — naïve transfer would be unsound; this can only speed up,
+never change the answer. On the small, plan-rich demo domains PDR derives few
+reasons, so the effect is ≈neutral. The contribution is the *sound mechanism*; the
+payoff is expected on dead-end-heavy / larger instances we haven't run.
 
-### L3 self-authoring of features & domains. *Implemented.*
-`selfauthor.py` lets L3 rewrite two of its own ingredients: (1) it greedily ADDS
-derived features (ratios, products, logs) to the L1 meta-policy whenever they
-lower leave-one-out prediction regret (the base set is always retained, so it can
-never regress); and (2) it auto-generates a *frontier curriculum* — instances in
-an auto-calibrated difficulty band (hard-but-solvable for the default solver),
-where learning signal is richest. Run `python3 -m pdr.selfauthor`.
-
-### Still open
-  * A PDDL front-end and an IPASIR/CaDiCaL SAT backend (the biggest scaling win —
-    `sat.py` is a 5-method seam).
-  * More seams: clause-push order, the FOND sink-removal order.
-  * Live, large-budget LLM-in-the-loop sweeps across all seams at once.
+### Feature engineering & curriculum generation. *Implemented.*
+(Previously oversold as "L3 self-authoring.") `selfauthor.py` does two known,
+useful things: (1) greedy **LOOCV-guided feature engineering** — adds derived
+features to the L1 policy only when they lower leave-one-out regret (base set
+always retained, so it can't regress); and (2) **difficulty-band curriculum
+generation** — instances in an auto-calibrated hard-but-solvable band. These are
+feature selection and teacher–student curriculum learning, fine on their own
+merits and labelled as such.
 
 ---
 
-## Concrete near-term roadmap (grounded in this repo)
+## Methodology & threats to validity
 
-1. **Transfer learned reasons across a curriculum (cheap, high value).** Lift
-   PDR reason-clauses on small instances into *schemas* and seed them into
-   larger instances of the same domain. The layers in `pdr.py`/`fond.py` are
-   already clause sets — seeding is an `_add_reason_clause` at startup. Expect
-   the biggest single speedup, and it makes the frontier genuinely compounding
-   rather than just well-configured.
+Read the headline numbers through these. They are the difference between
+"prototype" and "result," and the work is currently the former.
 
-2. **Auto-generate the curriculum** instead of hand-listing sizes: mutate a
-   domain (add packages/blocks/fuel/outcomes) and keep instances near the
-   capability boundary — the ones that teach the most.
+1. **Fitness is SAT-call count, not wall-clock. This is the biggest caveat.**
+   Ava's Table 3.1 shows cost-per-call moving ~4 orders of magnitude (F=3 ≈ 0.6s
+   vs F=6 ≈ 6197s at comparable macro counts). An operator that issues *fewer but
+   harder* SAT queries can win on calls while **losing on runtime**. So the
+   1.22×/1.28×/4.7× numbers mean **"fewer SAT queries,"** not "faster planner."
+   - *Why calls, not time, for the objective:* SAT-call count is deterministic and
+     engine-pinned (`FITNESS_ENGINE = minisat22`), so the search is reproducible
+     and noise-free. Wall-clock is what you feel but is machine/backend/noise
+     dependent.
+   - *What we now also do:* the evaluator records **per-instance wall-clock (ms)**
+     alongside calls, and the in-app bench lets you flip the comparison between SAT
+     calls and wall-clock — precisely so you can see where the two disagree. A
+     runtime-primary (or multi-objective) fitness, and peak-memory, are the right
+     next step.
 
-3. **Wire L2's first operator seam.** Expose `PDR._progress` and the obligation
-   comparator as pluggable strategies, give the harness a `--candidate` hook,
-   and run a small FunSearch loop over LLM-proposed comparators. Obligation
-   ordering is the safest first target (it can't affect soundness, only speed),
-   so a bad candidate just loses on time, never on correctness.
+2. **Demo domains, not benchmarks. Structural, not a footnote.** The thesis's
+   load-bearing observation comes from IPC 1998–2014 across diverse domains. Our
+   loop "rediscovering" that large-`F` PDR-M suits logistics-shaped instances is a
+   *sanity check*, and risks circularity if the demo generator is logistics-shaped
+   to begin with. The claim "the loop selects, then invents, those moves on its
+   own" is only evaluable on a substrate we did **not** design.
+   - *Now done (closes part of the gap):* a real PDDL front-end (`pddl.py`) and a
+     real SAT backend (python-sat / **Lingeling**, also CaDiCaL) exist, and a real
+     **IPC-2000 logistics-10-0** instance solves end-to-end (1040 ground actions).
+   - *Still the real gap:* the **evolution loop has not been re-run on the IPC
+     suite at scale.** Doing so is what would move this from prototype to result.
 
-4. **Self-improving FOND.** The FOND policy generator's sink-removal ordering and
-   the forward-push schedule are tunable; the same L0/L1 machinery applies, with
-   `reference_answer` as the correctness oracle.
+3. **Sample sizes, seeds, variance.** The L1 table is 4 rows, 3–9 instances each;
+   the evolution numbers are single-seed; there are no confidence intervals, no
+   ablation over curriculum order, no robustness check across demo generators. For
+   anything framed as "compounding," multi-seed runs with CIs are not optional.
+   Treat every number here as a single-seed point estimate.
 
-The throughline: the thesis spent five chapters hand-designing a family of PDR
-moves and showed empirically that the *right move depends on the problem*. RSI
-turns that observation into a system that selects, and then invents, those moves
-on its own — with the thesis's soundness/validation guarantees as the guardrail
-that keeps the loop honest.
+4. **"Held-out" is held-out *instances*, not *domains*.** The validation/test sets
+   are larger instances from the same generators as training. The fresh test set
+   helps, but the stronger (and honest) version is held-out **domains** — train on
+   logistics, test on blocksworld/depots/etc.
+
+5. **The safety gate is not "uncheatable."** It guarantees **soundness on every
+   instance an operator runs on** — that genuinely cannot be gamed. It does **not**
+   guarantee *fitness* generalisation: an operator can be sound everywhere yet slow
+   on instances outside the suite. That's exactly the overfitting the held-out
+   story documents, and the right framing is *"soundness preserved always;
+   generalisation enforced by held-out validation, which is necessary and not
+   automatic,"* not "cannot be cheated."
+
+6. **The L1 learner is a placeholder** (see its caveat): NN, not RF/AutoFolio with
+   CV.
+
+---
+
+## What's done, and what would make this credible to a serious reader
+
+**Now in the repo (some of it since the first review):**
+- PDDL front-end (`pddl.py`); real SAT backend (Lingeling/CaDiCaL via python-sat);
+  a real IPC-2000 instance solving end-to-end.
+- Per-instance wall-clock recorded alongside SAT calls; an interactive bench that
+  compares two operator/run configs per-instance and flips between the two metrics.
+- The held-out train/validation/test discipline, with the overfitting failure and
+  its fix both reproducible.
+
+**What would actually cash the cheques (in priority order):**
+1. **Make fitness wall-clock (keep SAT calls as a secondary, reproducible metric).**
+   Single biggest credibility move.
+2. **Re-run the evolution loop on the IPC subset Ava uses**, on the real backend —
+   this tests the actual claim on a substrate we didn't design.
+3. **Replace / benchmark the L1 NN learner** against random forest with proper CV,
+   and ideally off-the-shelf AutoFolio.
+4. **Report seeds and confidence intervals everywhere**; ablate curriculum order.
+5. **Write held-out *domains*, not just instances.**
+6. **Cite and position against** SATzilla, ParamILS/SMAC, AutoFolio, FunSearch,
+   AlphaEvolve, and the learning-to-branch literature throughout.
+
+---
+
+## The honest throughline
+
+The thesis hand-designed a family of PDR moves and showed the right move depends on
+the problem. This layer turns that into a loop that **selects** the right move per
+problem and, on the progression seam, **synthesises** a new one — operationalising
+Ava's own §7.2 conjecture — with her soundness/validation guarantees as a gate that
+keeps the loop honest. The mechanism is sound and the held-out discipline is real.
+The *evidence* is currently prototype-scale: demo domains, SAT-call proxy,
+single-seed, a placeholder selector. Tighten those and it is a credible follow-on
+to the thesis; left as-is, it is a promising prototype that should not be dressed
+as more.

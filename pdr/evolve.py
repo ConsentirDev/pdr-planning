@@ -133,11 +133,12 @@ def _evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
             res = pdr.solve()
         except Exception:
             valid = False
-            per[name] = {"sat": None, "ok": False, "note": "error"}
+            per[name] = {"sat": None, "ms": None, "ok": False, "note": "error"}
             continue
-        wall += time.perf_counter() - t0
+        dt = time.perf_counter() - t0
+        wall += dt
         if res.solvable is None:           # timed out -> not covered
-            per[name] = {"sat": None, "ok": False, "note": "timeout"}
+            per[name] = {"sat": None, "ms": round(dt * 1000, 1), "ok": False, "note": "timeout"}
             continue
         ok = True
         if res.solvable != refs[name]:     # wrong answer -> unsafe
@@ -147,7 +148,10 @@ def _evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
         cov += 1
         sc = res.stats["sat_calls"]
         sat += sc
-        per[name] = {"sat": sc, "ok": ok, "note": "solved" if res.solvable else "proved-unsat"}
+        # SAT-call count is the reproducible PRIMARY metric; wall-clock (ms) is
+        # tracked alongside it because calls != runtime (cost/call varies hugely).
+        per[name] = {"sat": sc, "ms": round(dt * 1000, 1), "ok": ok,
+                     "note": "solved" if res.solvable else "proved-unsat"}
     e = Eval(cov, len(instances), sat, wall, valid, train_sat=sat, valid_sat=sat)
     e.per_instance = per
     return e

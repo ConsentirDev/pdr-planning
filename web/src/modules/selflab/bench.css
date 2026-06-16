@@ -67,4 +67,7 @@
 .bench-table .wcol.wb { color: var(--mint); }
 .bench-table .bench-total td { border-top: 1px solid var(--line); border-bottom: none; padding-top: 9px; font-weight: 700; color: var(--tx); }
 .bench-cmp-note { margin: 12px 0 0; font-size: 12px; color: var(--tx-3); line-height: 1.55; }
+.bench-metric { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.bench-metric button { font-family: var(--font-mono); font-size: 10px; padding: 4px 11px; background: transparent; color: var(--tx-3); border: none; cursor: pointer; }
+.bench-metric button.on { background: var(--cyan); color: var(--ink); font-weight: 600; }
 .bench-x { display: none; }

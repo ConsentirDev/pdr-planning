@@ -215,13 +215,27 @@ function BenchRow({ it, picked, onPick }: { it: BenchItem; picked: boolean; onPi
 
 function Compare({ a, b }: { a: BenchItem; b: BenchItem }) {
   const ra = a.result!, rb = b.result!;
-  // union of instance names, in a stable order
+  const [metric, setMetric] = useState<"sat" | "ms">("sat");
   const names = ra.per_instance.map((p) => p.name);
   const bByName = Object.fromEntries(rb.per_instance.map((p) => [p.name, p]));
+  const val = (p: any) => (p == null ? null : metric === "sat" ? p.sat : p.ms);
+  const baseVal = (p: any) => (p == null ? null : metric === "sat" ? p.baseline_sat : p.baseline_ms);
+  const totA = names.reduce((s, nm) => s + (val(ra.per_instance.find((p) => p.name === nm)) ?? 0), 0);
+  const totB = names.reduce((s, nm) => s + (val(bByName[nm]) ?? 0), 0);
+  const unit = metric === "sat" ? "" : " ms";
+  const fmt = (v: number | null) => (v == null ? "—" : metric === "ms" ? v.toFixed(1) : v);
+
   return (
     <div className="bench-compare panel">
       <div className="panel-h"><span className="eyebrow">side-by-side · per-instance deep dive</span>
-        <button className="bench-x" onClick={() => { /* deselect handled by row toggle */ }} /></div>
+        <div className="bench-metric">
+          {(["sat", "ms"] as const).map((m) => (
+            <button key={m} className={metric === m ? "on" : ""} onClick={() => setMetric(m)}>
+              {m === "sat" ? "SAT calls" : "wall-clock"}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="bench-cmp-heads">
         <CmpHead it={a} side="A" /><span className="bench-vs num">vs</span><CmpHead it={b} side="B" />
       </div>
@@ -231,28 +245,33 @@ function Compare({ a, b }: { a: BenchItem; b: BenchItem }) {
           {names.map((nm) => {
             const pa = ra.per_instance.find((p) => p.name === nm)!;
             const pb = bByName[nm];
-            const av = pa?.sat, bv = pb?.sat;
+            const av = val(pa), bv = val(pb);
             const winner = av == null ? "B" : bv == null ? "A" : av < bv ? "A" : bv < av ? "B" : "=";
             return (
               <tr key={nm}>
                 <td className="l mono">{nm}</td>
                 <td className="dim">{pa?.set}</td>
-                <td className={winner === "A" ? "win" : ""}>{av ?? "—"}</td>
-                <td className={winner === "B" ? "win" : ""}>{bv ?? "—"}</td>
-                <td className="dim">{pa?.baseline_sat ?? "—"}</td>
+                <td className={winner === "A" ? "win" : ""}>{fmt(av)}{unit}</td>
+                <td className={winner === "B" ? "win" : ""}>{fmt(bv)}{unit}</td>
+                <td className="dim">{fmt(baseVal(pa))}{unit}</td>
                 <td className={`wcol ${winner === "A" ? "wa" : winner === "B" ? "wb" : ""}`}>{winner}</td>
               </tr>
             );
           })}
           <tr className="bench-total">
             <td className="l">TOTAL</td><td className="dim">{ra.coverage}/{ra.n}</td>
-            <td className={ra.sat_calls <= rb.sat_calls ? "win" : ""}>{ra.safe ? ra.sat_calls : "unsafe"}</td>
-            <td className={rb.sat_calls <= ra.sat_calls ? "win" : ""}>{rb.safe ? rb.sat_calls : "unsafe"}</td>
-            <td className="dim">{ra.baseline_sat}</td><td />
+            <td className={ra.safe && totA <= totB ? "win" : ""}>{ra.safe ? fmt(totA) + unit : "unsafe"}</td>
+            <td className={rb.safe && totB <= totA ? "win" : ""}>{rb.safe ? fmt(totB) + unit : "unsafe"}</td>
+            <td className="dim">—</td><td />
           </tr>
         </tbody>
       </table>
-      <p className="bench-cmp-note">SAT-calls per instance under one pinned engine (lower wins). Coverage must be {ra.n}/{ra.n} to count as <Term k="strongcyclic">safe</Term> — an operator that solves fewer is rejected, never silently faster.</p>
+      <p className="bench-cmp-note">
+        {metric === "sat"
+          ? <>SAT-calls is the <b>reproducible</b> metric (engine-pinned, noise-free) — but calls ≠ runtime: an operator can issue <b>fewer but harder</b> calls. Flip to wall-clock to check the two agree.</>
+          : <>Wall-clock is what you actually feel, but it's <b>noisy</b> (one run, this machine, this backend). The reproducible ranking uses SAT-calls. Where the two disagree, trust neither blindly.</>}
+        {" "}Coverage must be {ra.n}/{ra.n} to count as <Term k="strongcyclic">safe</Term>.
+      </p>
     </div>
   );
 }

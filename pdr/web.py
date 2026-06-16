@@ -137,9 +137,11 @@ def _run_eval(spec):
     base = evaluate(baseline_operator(seam), insts, refs, tl, kc)
     per = [{"name": n, "set": setof.get(n, "?"),
             "sat": ev.per_instance.get(n, {}).get("sat"),
+            "ms": ev.per_instance.get(n, {}).get("ms"),
             "ok": ev.per_instance.get(n, {}).get("ok"),
             "note": ev.per_instance.get(n, {}).get("note"),
-            "baseline_sat": base.per_instance.get(n, {}).get("sat")} for n, _ in insts]
+            "baseline_sat": base.per_instance.get(n, {}).get("sat"),
+            "baseline_ms": base.per_instance.get(n, {}).get("ms")} for n, _ in insts]
     return {"module": "evaluate",
             "meta": {"seam": seam, "problem_set": pset, "instances": [n for n, _ in insts]},
             "result": {"op": _op_view(op), "sat_calls": ev.sat_calls, "coverage": ev.coverage,

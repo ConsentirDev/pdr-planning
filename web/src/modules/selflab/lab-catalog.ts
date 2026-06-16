@@ -42,8 +42,8 @@ export const PROBLEM_SETS = [
 
 // shape returned by the evaluate endpoint
 export interface PerInstance {
-  name: string; set: string; sat: number | null; ok: boolean | null;
-  note?: string; baseline_sat: number | null;
+  name: string; set: string; sat: number | null; ms?: number | null; ok: boolean | null;
+  note?: string; baseline_sat: number | null; baseline_ms?: number | null;
 }
 export interface EvalResult {
   op: { name: string; origin: string; kind: string; spec: any };
