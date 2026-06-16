@@ -325,6 +325,25 @@ def test_evolution_finds_safe_improvement():
               f"({base.sat_calls/max(1,ev.sat_calls):.2f}x)")
 
 
+def test_parallel_evolution_matches_serial():
+    # parallel operator evaluation (workers>1) must give BYTE-IDENTICAL results to
+    # serial — it only changes wall-clock. SAT-call counts are deterministic, and
+    # the archive is ranked by (sat_calls, name), not noisy wall-clock.
+    from .evolve import evolutionary_search, train_valid_split
+
+    def run(workers):
+        best, _, arc, hist = evolutionary_search(
+            seam="progression", instances=train, valid=valid, generations=3,
+            pop_size=8, seed=1, time_limit=3, verbose=False, workers=workers)
+        return best[0].name, best[1].sat_calls, hist, arc.summary()
+
+    train, valid = train_valid_split()
+    serial, parallel = run(1), run(4)
+    assert serial == parallel, ("parallel != serial", serial, parallel)
+    print(f"  ok: parallel (4 workers) == serial — champion {serial[0]} "
+          f"@ {serial[1]} SAT calls, identical archive")
+
+
 def test_train_validation_split_selects_generalizing_operator():
     # Ranking on a held-out validation set (the overfitting fix) must select an
     # operator that actually generalises -- here, beating fixed PDR-M(F=3) on a

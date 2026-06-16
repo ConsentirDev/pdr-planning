@@ -32,8 +32,10 @@ re-runs it with `python-sat` uninstalled to protect the zero-dependency path.
 
 ## Good first contributions
 These map to the open gaps in `docs/SCALING.md` and `pdr/RSI.md`:
-- **Parallelise operator evaluation** in `evolve.py` (`ProcessPoolExecutor` over the
-  embarrassingly-parallel operator×instance grid) — the highest-value scaling change.
+- **Run the evolution loop on the hard IPC instances** (blocks-10, logistics-10/15)
+  on a bigger box — `evolutionary_search(workers=N)` already parallelises the eval
+  grid, so this is a compute/curriculum task. *This is the experiment that would let
+  RSI.md drop its "prototype" caveat.*
 - **Full ADL in the PDDL front-end** (`pddl.py` is `:strips`/`:typing`/`oneof` today;
   conditional effects / quantifiers / derived predicates would unlock more IPC domains).
 - **A real selector benchmark** — wire the L1 learner to ASlib / AutoFolio with proper

@@ -234,15 +234,13 @@ class Archive:
     def consider(self, op, ev):
         if not ev.safe:
             return False
-        # de-duplicate operators that score identically (keep the first name)
-        for _, e in self.members:
-            if e.sat_calls == ev.sat_calls and e.wall <= ev.wall + 1e-9:
-                # an equally-fast member already exists; only archive if novel name
-                if any(o.name == op.name for o, _ in self.members):
-                    return False
+        # de-duplicate by (name, score); ranking is deterministic — SAT calls then
+        # name, NOT wall-clock (which is noisy and would make the archive depend on
+        # timing / parallelism). Reproducible across runs and worker counts.
+        if any(o.name == op.name and e.sat_calls == ev.sat_calls for o, e in self.members):
+            return False
         self.members.append((op, ev))
-        self.members.sort(key=lambda m: (m[1].sat_calls, m[1].wall))
-        # keep capacity, but always retain distinct sat_call levels for diversity
+        self.members.sort(key=lambda m: (m[1].sat_calls, m[0].name))
         self.members = self.members[:self.capacity]
         return any(o is op for o, _ in self.members)
 
@@ -300,10 +298,33 @@ def _cand_detail(o, e, split):
             "parent": o.parent, "delta": delta, "reason": reason}
 
 
+# ---------------------------------------------------------------------------
+# parallel population scoring (workers>1). The operator x instance grid is
+# embarrassingly parallel; PROCESS pools (not threads) are used deliberately —
+# evaluate() pins a global fitness engine, and process isolation makes that pin
+# safe. Results are byte-identical to serial (SAT-call counts are deterministic);
+# parallelism only changes wall-clock. Worth it on heavy (real-IPC) instances,
+# not on the tiny demo curriculum where process startup dominates.
+# ---------------------------------------------------------------------------
+_PAR = {}
+
+
+def _par_init(instances, valid, refs, refs_v, time_limit, k_cap, split):
+    _PAR.clear()
+    _PAR.update(instances=instances, valid=(instances if not split else valid),
+                refs=refs, refs_v=refs_v, time_limit=time_limit, k_cap=k_cap)
+
+
+def _par_eval(op):
+    p = _PAR
+    return evaluate_split(op, p["instances"], p["valid"], p["refs"], p["refs_v"],
+                          p["time_limit"], p["k_cap"])
+
+
 def evolutionary_search(seam="obligation", instances=None, valid=None, generations=6,
                         pop_size=10, elite=3, scale=0.6, seed=0,
                         time_limit=4.0, k_cap=60, archive=None, verbose=True, tracer=None,
-                        rank_by="sat"):
+                        rank_by="sat", workers=1):
     """If `valid` is given, candidates are RANKED by validation fitness (and must
     be safe on both train and validation) -- this prevents overfitting. If `valid`
     is None it defaults to `instances` (legacy single-set behaviour)."""
@@ -319,6 +340,23 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
     def ev_of(op):
         return evaluate_split(op, instances, valid, refs, refs_v, time_limit, k_cap)
 
+    def score_pop(pop):
+        """Evaluate a whole population; in parallel when workers>1 (identical result)."""
+        if workers and workers > 1 and len(pop) > 1:
+            from concurrent.futures import ProcessPoolExecutor
+            # strip the (unpicklable) compiled callable + lineage; rebuilt in workers
+            clean = [Operator(o.name, o.seam, o.kind, o.spec, o.origin) for o in pop]
+            with ProcessPoolExecutor(
+                    max_workers=workers, initializer=_par_init,
+                    initargs=(instances, valid, refs, refs_v, time_limit, k_cap, split)) as ex:
+                evs = list(ex.map(_par_eval, clean))
+        else:
+            evs = [ev_of(op) for op in pop]
+        scored = list(zip(pop, evs))           # pair with ORIGINAL ops (keep lineage)
+        for op, ev in scored:
+            archive.consider(op, ev)
+        return scored
+
     # generation 0: seeds + random
     pop = list(ops.seed_operators()[seam])
     while len(pop) < pop_size:
@@ -329,11 +367,7 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
     history = []
     best = None
     for gen in range(generations):
-        scored = []
-        for op in pop:
-            ev = ev_of(op)
-            scored.append((op, ev))
-            archive.consider(op, ev)
+        scored = score_pop(pop)
         scored.sort(key=lambda x: x[1].fitness(rank_by))
         if best is None or scored[0][1].fitness(rank_by) < best[1].fitness(rank_by):
             best = scored[0]
@@ -629,6 +663,9 @@ def main():
     ap.add_argument("--model", default="claude-sonnet-4-6", help="llm mode: Anthropic model id")
     ap.add_argument("--split", action="store_true",
                     help="rank by held-out validation (larger instances) to avoid overfitting")
+    ap.add_argument("--workers", type=int, default=1,
+                    help="parallel operator evaluation across processes (use on heavy/IPC "
+                         "instances; identical results, only faster). default 1 = serial")
     args = ap.parse_args()
 
     train, valid = (train_valid_split() if args.split else (None, None))
@@ -659,7 +696,8 @@ def main():
     else:
         print(f"L2 autonomous evolution of the '{args.seam}' operator:\n")
         best, base, arc, hist = evolutionary_search(
-            seam=args.seam, instances=train, valid=valid, generations=args.generations)
+            seam=args.seam, instances=train, valid=valid, generations=args.generations,
+            workers=args.workers)
     if best:
         op, ev = best
         metric = "validation SAT calls" if args.split else "SAT calls"

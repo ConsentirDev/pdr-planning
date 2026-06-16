@@ -291,6 +291,33 @@ def exp_seeds(n_seeds=6):
 
 
 # ---------------------------------------------------------------------------
+# parallel operator evaluation: identical results, faster (the SCALING #2 plan)
+# ---------------------------------------------------------------------------
+def exp_parallel():
+    print("\n=== Parallel operator evaluation: serial vs workers (identical, faster) ===")
+    import os
+    from .evolve import evolutionary_search, train_valid_split
+    train, valid = train_valid_split()
+    nproc = max(2, (os.cpu_count() or 2))
+
+    def run(w):
+        t = time.perf_counter()
+        best, _, arc, hist = evolutionary_search(seam="progression", instances=train,
+            valid=valid, generations=5, pop_size=12, seed=1, time_limit=4,
+            verbose=False, workers=w)
+        return (best[0].name, best[1].sat_calls, hist, arc.summary()), time.perf_counter() - t
+
+    s, st = run(1)
+    p, pt = run(nproc)
+    print(f"  serial  (1 worker)  : {st:5.1f}s")
+    print(f"  parallel ({nproc} workers): {pt:5.1f}s   speed-up {st/max(1e-6, pt):.1f}x")
+    print(f"  identical result (champion / SAT-calls / history / archive): {s == p}")
+    print("  Speed-up is sub-linear on this tiny curriculum (process startup ~= eval time);")
+    print("  on the heavy real-IPC instances each eval dwarfs startup, so it scales ~linearly")
+    print("  with cores — that's what a `fly scale vm performance-8x` session buys.")
+
+
+# ---------------------------------------------------------------------------
 # (#5) held-out DOMAINS (synthetic): evolve on one domain, test on another
 # ---------------------------------------------------------------------------
 def exp_crossdomain():
@@ -348,6 +375,8 @@ def main(argv):
         exp_selector()
     if which in ("crossdomain", "all"):
         exp_crossdomain()
+    if which in ("parallel", "all"):
+        exp_parallel()
     if which in ("fitness", "all"):
         exp_fitness()
     if which in ("seeds", "all"):

@@ -111,13 +111,17 @@ to close it, in order of leverage:
    included (blocks-10, logistics-10-0/11). Scale back to `performance-2x` (or
    scale-to-zero) afterward so idle cost stays near nothing. The SSE stream already
    surfaces progress on minutes-long runs.
-2. **Parallelise operator evaluation.** The `(operator × instance)` grid in
-   `evolve.py` is embarrassingly parallel; a `ProcessPoolExecutor` over a
-   generation's population gives ~Nx throughput on an 8-vCPU box — turning
-   evolution-on-real-IPC from hours into minutes. This is the highest-value code
-   change and touches only the evaluation loop (the merge/archive logic is
-   unchanged). PS-PDR (`parallel.py`) already releases the GIL via the C solver, so
-   process-pool scaling is a natural fit.
+2. **Parallelise operator evaluation — *done*.** The `(operator × instance)` grid
+   in `evolve.py` is embarrassingly parallel: `evolutionary_search(workers=N)` (or
+   `python -m pdr.evolve … --workers N`) scores each generation's population across
+   a `ProcessPoolExecutor`. Processes, not threads, on purpose — `evaluate()` pins a
+   global fitness engine, so process isolation keeps it safe. Results are
+   **byte-identical to serial** (a regression test asserts champion + history +
+   archive match; the archive is ranked by `(sat_calls, name)`, not noisy wall-clock)
+   — parallelism only changes wall-clock. Speed-up is sub-linear on the tiny demo
+   curriculum (startup ≈ eval), but each eval dwarfs startup on heavy real-IPC
+   instances, so it scales ~linearly with cores — which is what makes a
+   `performance-8x` session pay off. (`python -m pdr.experiments parallel`.)
 3. **Run the IPC subset Ava uses, multi-seed, with CIs.** `experiments.load_ipc`
    already pulls real strips-typed IPC domains; extend it to the `:strips` subset of
    her evaluation set (logistics, gripper, blocks, miconic, movie, …), run
