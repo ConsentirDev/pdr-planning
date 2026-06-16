@@ -90,8 +90,10 @@ export function RaceTab({ mode }: { mode: string }) {
             <Term k="lookahead">look-ahead</Term>.{" "}
             <span className="hl">baseline</span> asks one <Term k="sat">SAT</Term> question at a time;{" "}
             <span className="hl" style={{ color: "var(--violet)" }}>PDR-M (F=3)</span> and{" "}
-            <span className="hl-mint">PDR-IL (F=2)</span> peek several fences ahead. Fewer SAT calls = smarter search.
-            {domain === "logistics" && " On Logistics, PDR-M sometimes nails it in a single call."}
+            <span className="hl-mint">PDR-IL (F=2)</span> peek several layers ahead — trading more work per
+            SAT call for fewer calls. We race on <b>SAT-call count</b>, a proxy for search <em>effort</em> —
+            <b> not wall-clock</b> (one SAT call can take far longer than another).
+            {domain === "logistics" && " On Logistics, PDR-M sometimes solves it in a single (big) call."}
           </p>
         </div>
       )}
@@ -101,7 +103,7 @@ export function RaceTab({ mode }: { mode: string }) {
       ) : (
         <div className="panel race-track">
           <div className="panel-h">
-            <div><span className="eyebrow">live · shared timeline</span> <span className="rd-iter-tag" style={{ marginLeft: 8 }}>SAT calls accrue as each solver thinks</span></div>
+            <div><span className="eyebrow">live · shared timeline</span> <span className="rd-iter-tag" style={{ marginLeft: 8 }}>SAT calls accrue — search effort, not wall-clock</span></div>
           </div>
           <div className="race-lanes">
             {runs.map((r, i) => {
@@ -142,7 +144,7 @@ export function RaceTab({ mode }: { mode: string }) {
             <motion.div className="race-podium" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <div className="race-podium-h">
                 <h3>Final tally</h3>
-                <span className="eyebrow">SAT calls · lower is better</span>
+                <span className="eyebrow">SAT calls (search effort) · fewer ≠ necessarily faster</span>
               </div>
               <div className="race-cmp">
                 {runs.map((r, i) => {
@@ -166,10 +168,10 @@ export function RaceTab({ mode }: { mode: string }) {
               </div>
               {mode === "learn" && winnerIdx >= 0 && (
                 <p style={{ marginTop: 12, fontSize: 13, color: "var(--tx-2)", lineHeight: 1.6 }}>
-                  <span className="race-crown">♛ {runs[winnerIdx].name}</span> wins with{" "}
-                  <b style={{ color: "var(--mint)" }}>{minFinal}</b> SAT call{minFinal === 1 ? "" : "s"}
-                  {minFinal === 1 ? " — it saw the whole plan in one question." :
-                    `, vs ${maxFinal} for the slowest. Deeper look-ahead means fewer dead ends to learn from.`}
+                  <span className="race-crown">♛ {runs[winnerIdx].name}</span> uses the fewest{" "}
+                  <Term k="sat">SAT calls</Term>: <b style={{ color: "var(--mint)" }}>{minFinal}</b>
+                  {minFinal === 1 ? " — it folded the whole plan into one (large) query." :
+                    ` vs ${maxFinal} for the most. Deeper look-ahead trades more work per call for fewer calls — fewer calls, but remember each can cost very differently in time.`}
                 </p>
               )}
             </motion.div>
@@ -192,8 +194,8 @@ function Welcome({ busy }: { busy: boolean }) {
         <h2>Three solvers, one finish line.</h2>
         <p className="rd-welcome-p">
           The same planning problem, attacked by <span className="hl">baseline</span> PDR and two
-          look-ahead variants. Watch their SAT-call counters climb on a shared timeline — the one that
-          reaches the goal with the fewest questions wins.
+          look-ahead variants. Watch their SAT-call counters climb — the one that reaches the goal with
+          the fewest queries wins. (SAT calls measure search <em>effort</em>, not wall-clock time.)
         </p>
         <p className="eyebrow">{busy ? "booting python in your browser…" : "press ▶ run above"}</p>
       </motion.div>

@@ -115,7 +115,7 @@ export default function Explorer() {
           <div className="ex-main" style={{ gridTemplateColumns: `1fr ${sideW}px` }}>
             <div className="ex-fences panel">
               <div className="panel-h">
-                <div><span className="eyebrow">the fences</span> <span className="ex-h-sub">reachability layers, learned backward from the goal</span></div>
+                <div><span className="eyebrow">the layers</span> <span className="ex-h-sub">reachability layers (frames), learned backward from the goal</span></div>
                 <Stats st={st!} result={trace.result} />
               </div>
               <div className="ex-fences-body">
@@ -156,7 +156,7 @@ function Welcome({ mode, busy }: { mode: string; busy: boolean }) {
             Watch a planner<br />think.
           </motion.h1>
           <motion.p className="ex-welcome-p rise-3">
-            PDR reasons <em>backward</em> from the goal, keeping nested fences —
+            PDR reasons <em>backward</em> from the goal, keeping nested layers —
             {" "}<span className="hl">L0</span> is the goal, <span className="hl">L1</span> is one
             move away — and <span className="hl-amber">learning from every dead end</span> until
             a path appears, or it proves none can.
@@ -246,16 +246,27 @@ function narrate(meta: Meta, ev: Ev | null, st: ReturnType<typeof deriveExplorer
   if (!ev) return "Press play to watch PDR search backward from the goal, one little SAT question at a time.";
   switch (ev.t) {
     case "k": return `No plan exists within ${ev.k - 1} step(s), so PDR widens the horizon to k=${ev.k} and tries again.`;
-    case "pop": return `PDR asks a little yes/no question: can THIS state reach the goal in ${ev.layer} step(s)?`;
-    case "progress": return `Yes — there's a move (${(ev.actions[0] || []).join(", ") || "an action"}) landing one fence closer, at L${ev.succ_layer}. That successor becomes the next question.`;
-    case "reason": return `Dead end. PDR works out a small reason it's stuck and bricks "${facts(meta, ev.reason)}" into every fence up to L${ev.layer}, so it never wastes time there again.`;
-    case "reschedule": return `The state couldn't progress here, so PDR gives it another chance at the looser fence L${ev.to_layer}.`;
-    case "push": return `A learned dead-end is pushed forward to L${ev.layer} — strengthening the fences.`;
+    case "pop": return ev.layer === 0
+      ? `PDR checks this obligation against L0: does it already satisfy the goal?`
+      : `PDR asks one little yes/no question — and it only ever looks ONE layer ahead: can this obligation step into L${ev.layer - 1} (one layer closer to the goal) in a single move?`;
+    case "progress": return `Yes — a move (${(ev.actions[0] || []).join(", ") || "an action"}) lands it in the next layer, L${ev.succ_layer}. That successor becomes the next obligation.`;
+    case "reason": return `It can't progress. PDR learns an inductive reason — abstracts this stuck state into a small cube "${facts(meta, ev.reason)}" and adds its negation to the layers up to L${ev.layer}, so it never wastes time there again.`;
+    case "reschedule": return `The state couldn't progress here, so PDR re-queues it at the looser layer L${ev.to_layer} to try again once more has been learned.`;
+    case "push": return isInvariantClause(meta, ev.clause)
+      ? `A known mutex invariant (computed up-front, not learned) is propagated to L${ev.layer} — these constrain every layer from the start.`
+      : `A learned clause still holds at L${ev.layer}, so it's pushed forward — strengthening the layer and driving the convergence test.`;
     case "plan": return ev.steps === 0 ? "The start already satisfies the goal — nothing to do!" : `An obligation reached L0 — the goal is reachable from the start. PDR stitches the moves into a ${ev.steps}-step plan.`;
-    case "converged": return "Two neighbouring fences became identical — nothing can change anymore, so PDR has PROVED no plan exists. (It never had to imagine the whole world at once.)";
+    case "converged": return "Two neighbouring layers became identical — nothing can change anymore, so PDR has PROVED no plan exists. (It never had to imagine the whole world at once.)";
     default: return "…";
   }
 }
 function facts(meta: Meta, cube: number[]): string {
   return cube.filter((l) => l > 0).map((l) => meta.props[Math.abs(l) - 1]).join(", ") || "∅";
+}
+// A pushed clause is a known mutex invariant (preprocessing) rather than a learned
+// reason iff it matches one of meta.invariants. Compare as sorted literal sets.
+function isInvariantClause(meta: Meta, clause: number[]): boolean {
+  const key = (xs: number[]) => [...xs].sort((a, b) => a - b).join(",");
+  const target = key(clause);
+  return (meta.invariants ?? []).some((inv) => key(inv) === target);
 }

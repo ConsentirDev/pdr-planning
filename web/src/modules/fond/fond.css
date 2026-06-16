@@ -242,3 +242,8 @@
 @media (max-width: 980px) {
   .fond-main { grid-template-columns: 1fr; }
 }
+
+/* "not yet solved" legend swatch + the transient "currently set aside" node */
+.lg-sw.dim { background: var(--ink-3); border-color: var(--line); opacity: 0.6; }
+.fg-node.examining { border-color: var(--amber); box-shadow: 0 0 0 1px rgba(245,179,90,0.4); }
+.fg-node.examining .fg-node-tag { color: var(--amber); }

@@ -4,9 +4,11 @@ import { cubeFacts, type ExplorerState } from "./derive";
 import type { Inspect } from "./Inspector";
 import "./fences.css";
 
-// The backward "fences": L0 = the goal, L1 = one move away, … Each layer holds
-// the dead-ends (reasons) PDR has learned. Watch them fill backward. Everything
-// here is clickable — it feeds the Inspector the real clauses behind it.
+// The backward layers (L0 = the goal, L1 = one move away, …). Each layer holds
+// clauses: KNOWN mutex invariants (seeded up-front) and INDUCTIVELY-learned reasons.
+// We distinguish them — they are not the same thing. Everything here is clickable.
+const sortKey = (xs: Lit[]) => [...xs].sort((a, b) => a - b).join(",");
+
 export function Fences({ meta, st, onInspect, selected }: {
   meta: Meta; st: ExplorerState;
   onInspect?: (t: Inspect) => void;
@@ -16,6 +18,10 @@ export function Fences({ meta, st, onInspect, selected }: {
   const selFence = selected?.kind === "fence" ? selected.i : -1;
   const selReason = selected?.kind === "reason" ? selected.cube.join(",") : null;
   const inspectable = !!onInspect;
+  // a layer cube blocks the clause ¬cube; it's a mutex invariant iff that clause
+  // matches one of meta.invariants (i.e. it was seeded, not learned).
+  const invClauses = new Set((meta.invariants ?? []).map(sortKey));
+  const isInvariant = (cube: Lit[]) => invClauses.has(sortKey(cube.map((l) => -l)));
   return (
     <div className={`fences ${inspectable ? "clickable" : ""}`}>
       {st.layers.map((layer, i) => {
@@ -23,7 +29,7 @@ export function Fences({ meta, st, onInspect, selected }: {
         return (
           <div className={`fence ${isCurrent ? "current" : ""} ${selFence === i ? "sel" : ""}`} key={i}>
             <button className="fence-cap" disabled={!inspectable}
-              onClick={() => onInspect?.({ kind: "fence", i })} title="inspect this fence’s clauses">
+              onClick={() => onInspect?.({ kind: "fence", i })} title="inspect this layer’s clauses">
               <span className="fence-idx num">{i === 0 ? "L0" : `L${i}`}</span>
               <span className="fence-tag eyebrow">{i === 0 ? "goal" : "≤" + i + " steps"}</span>
             </button>
@@ -37,19 +43,21 @@ export function Fences({ meta, st, onInspect, selected }: {
               <AnimatePresence initial={false}>
                 {layer.map((cube, j) => {
                   const ck = cube.join(",");
-                  const isNew = deadKey === ck && i <= (st.deadend?.layer ?? -1);
+                  const inv = isInvariant(cube);
+                  const isNew = !inv && deadKey === ck && i <= (st.deadend?.layer ?? -1);
                   return (
                     <motion.button
                       key={ck}
-                      className={`reason-chip ${isNew ? "flash" : ""} ${selReason === ck ? "sel" : ""}`}
+                      className={`reason-chip ${inv ? "invariant" : ""} ${isNew ? "flash" : ""} ${selReason === ck ? "sel" : ""}`}
                       disabled={!inspectable}
                       onClick={() => onInspect?.({ kind: "reason", cube })}
-                      title="inspect this learned clause"
+                      title={inv ? "mutex invariant — known up-front (preprocessing), NOT a learned reason"
+                                 : "inductively-learned reason — click to inspect the clause"}
                       initial={{ opacity: 0, x: -8, scale: 0.96 }}
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       transition={{ duration: 0.28, delay: Math.min(j, 6) * 0.012 }}
                     >
-                      <span className="reason-x">⚡</span>
+                      <span className="reason-x">{inv ? "⊥" : "⚡"}</span>
                       <FactRow facts={cubeFacts(meta, cube)} />
                     </motion.button>
                   );

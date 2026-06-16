@@ -9,23 +9,28 @@ import "./term.css";
 export const GLOSSARY: Record<string, { label: string; def: string; ref?: string }> = {
   pdr: {
     label: "PDR / IC3",
-    def: "Property Directed Reachability: prove reachability incrementally by maintaining frames (fences) of clauses and discharging proof obligations with a SAT solver — never building the whole state space.",
+    def: "Property Directed Reachability: prove reachability incrementally by maintaining layers (a.k.a. frames) of clauses and discharging proof obligations with a SAT solver — never building the whole state space.",
     ref: "Bradley 2011; thesis Ch 3",
   },
   fence: {
-    label: "fence (frame Fᵢ)",
-    def: "A CNF over-approximation of the states that can reach the goal in ≤ i steps. F₀ is the goal itself. A state is “in Fᵢ” iff it satisfies every clause in Fᵢ.",
-    ref: "Algorithm 2, Ch 3",
+    label: "layer (frame Fᵢ)",
+    def: "A CNF over-approximation of the states that can reach the goal in ≤ i steps. F₀ is the goal itself. A state is “in Fᵢ” iff it satisfies every clause in Fᵢ. (The thesis calls these layers; IC3 literature calls them frames. This app earlier said “fences” — a naming choice, now corrected.)",
+    ref: "layers, Algorithm 2",
   },
   obligation: {
     label: "proof obligation",
-    def: "A state PDR must resolve: can it step one fence closer to the goal? Pulled from a priority queue, lowest layer first. Resolving it either yields a successor (progress) or a learned reason (dead-end).",
+    def: "A state PDR must resolve: can it step into the NEXT layer (one move closer to the goal)? PDR only ever looks one layer ahead. Obligations are pulled lowest-layer-first; resolving one yields a successor (progress) or a learned reason. With rescheduling, an N-step plan can start from an obligation posted at a layer below N.",
     ref: "Algorithm 2",
   },
   reason: {
     label: "learned reason",
-    def: "A small set of facts (a cube) proven unable to reach the goal within i steps. Its negation is added as a clause to every fence up to i, so the search never revisits that region. Reasons are minimised to generalise as far as soundly possible.",
+    def: "An INDUCTIVELY learned dead-end: an abstraction of a state that FAILED to progress, generalised to a small cube and propagated backward. Its negation is added as a clause to layers up to i. (Distinct from a mutex invariant, which is known up-front — see below.)",
     ref: "reason minimisation, Ch 3",
+  },
+  invariant: {
+    label: "mutex invariant",
+    def: "A clause true in EVERY reachable state — e.g. “a package is in at most one place at once”. These are computed in PREPROCESSING (Schema 5) and seeded into the layers before PDR proper begins. They are NOT inductively-learned reasons: they don't come from a failed progression, and (unlike learned reasons) they can make the convergence/UNSAT test slower to trigger.",
+    ref: "Schema 5, Ch 2",
   },
   forallstep: {
     label: "∀-step encoding",
@@ -34,24 +39,24 @@ export const GLOSSARY: Record<string, { label: string; def: string; ref?: string
   },
   clause: {
     label: "clause / cube",
-    def: "A cube is a conjunction of literals (a partial state); a clause is a disjunction (the negation of a blocked cube). A fence is a set of clauses; blocking a dead-end cube means adding its negated clause.",
+    def: "A cube is a conjunction of literals (a partial state); a clause is a disjunction (the negation of a blocked cube). A layer is a set of clauses; blocking a dead-end cube means adding its negated clause.",
   },
   sat: {
     label: "SAT query",
-    def: "Each PDR step is a Boolean satisfiability question: does a truth assignment exist satisfying the encoded transition plus the target fence? Answered by a real solver — lingeling on the backend, a pure-Python DPLL in the browser.",
+    def: "Each PDR step is a Boolean satisfiability question: does a truth assignment exist satisfying the encoded transition plus the target layer? Answered by a real solver — lingeling on the backend, a pure-Python DPLL in the browser. (Note: different SAT calls can take VASTLY different amounts of time, so a count of calls is a proxy for search effort, not for runtime.)",
   },
   push: {
     label: "clause pushing",
-    def: "Propagating a learned clause forward to a later fence when it still holds there. Strengthens the frames and drives the convergence test.",
+    def: "Propagating a clause forward to a later layer when it still holds there. Strengthens the layers and drives the convergence test. (Both learned reasons and known mutex invariants get pushed.)",
     ref: "Algorithm 2",
   },
   reschedule: {
     label: "reschedule",
-    def: "When a state can’t progress at layer i, it is re-queued at a looser layer to be retried once the fences have learned more.",
+    def: "When a state can’t progress at layer i, it is re-queued at a looser layer to be retried once the layers have learned more.",
   },
   converged: {
     label: "convergence",
-    def: "When two adjacent fences become equal, nothing more can be learned — PDR has proved no plan exists, without ever enumerating the whole state space.",
+    def: "When two adjacent layers become equal, nothing more can be learned — PDR has proved no plan exists, without ever enumerating the whole state space.",
     ref: "termination, Ch 3",
   },
   strongcyclic: {
@@ -65,8 +70,13 @@ export const GLOSSARY: Record<string, { label: string; def: string; ref?: string
   },
   lookahead: {
     label: "look-ahead depth (F)",
-    def: "How many ∀-step transitions one obligation expands per SAT call. F=1 is baseline PDR; PDR-M with larger F peeks several fences ahead — more SAT work per call, but fewer calls overall. PDR-IL interleaves layers.",
+    def: "How many ∀-step transitions one obligation expands per SAT call. F=1 is baseline PDR; PDR-M with larger F peeks several layers ahead — more SAT work per call, but fewer calls overall. PDR-IL interleaves layers.",
     ref: "PDR-M / PDR-IL, Ch 3",
+  },
+  fondsolved: {
+    label: "solved vs unknown (FOND)",
+    def: "The policy generator starts from the goal states (solved), assumes every other state is solved too, then iteratively prunes any state that can be driven to a sink — until a sharp divide remains: states KNOWN to have a strong-cyclic policy (solved) vs states where it's still unknown. There are only these two outcomes; a state being “set aside” at a given horizon just means not-yet-solved, not a permanent dead-end.",
+    ref: "sink removal, Algorithm 5",
   },
   decomposition: {
     label: "decomposition (PD-PDR)",

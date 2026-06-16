@@ -138,13 +138,16 @@ function Nodes({ geo, st, meta }: { geo: Geometry; st: FondState; meta: Meta }) 
     <AnimatePresence initial={false}>
       {nodes.map((n) => {
         const solved = st.solved.has(n.key);
-        const dead = st.deadends.has(n.key);
+        // The policy generator produces a clean SOLVED vs NOT-YET-SOLVED divide.
+        // (We don't render individual "reason" states as permanent dead-ends — a
+        // reason at a given horizon just means "not yet shown solvable".)
+        const examining = !solved && st.lastReason === n.key;   // transient: currently set aside
         const cls = [
           "fg-node",
           n.isInit ? "init" : "",
           n.isGoal ? "goal" : "",
           solved ? "solved" : "",
-          dead && !solved ? "dead" : "",
+          examining ? "examining" : "",
           st.solved.size > 0 && !solved && !n.isGoal ? "dim" : "",
         ]
           .filter(Boolean)

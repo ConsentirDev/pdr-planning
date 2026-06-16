@@ -237,9 +237,9 @@ function Legend() {
     <div className="fond-legend">
       <span className="lg"><i className="lg-sw init" /> init</span>
       <span className="lg"><i className="lg-sw goal" /> goal outcome</span>
-      <span className="lg"><i className="lg-sw solved" /> solved (alive)</span>
+      <span className="lg"><i className="lg-sw solved" /> solved (has a policy)</span>
+      <span className="lg"><i className="lg-sw dim" /> not yet solved</span>
       <span className="lg"><i className="lg-sw chosen" /> policy action</span>
-      <span className="lg"><i className="lg-sw dead" /> dead-end</span>
     </div>
   );
 }
@@ -432,11 +432,11 @@ function narrate(meta: Meta, ev: Ev | null, st: FondState): string {
       } A policy must cope with all of them.`;
     }
     case "reason":
-      return `Dead end. The solver learns that "${facts(meta, ev.state)}" can never reach the goal, and marks it a sink to be removed.`;
+      return `With the information so far, the solver can't yet show "${facts(meta, ev.state)}" is always able to reach the goal — so it's set aside as not-yet-solved (it may still become solvable as the search continues; it is not a permanent dead-end).`;
     case "policy": {
       if (ev.has_init)
-        return `Policy snapshot: ${ev.solved.length} states are known-solved (mint) — and the start is now among them. We're closing in.`;
-      return `Sink removal: the generator keeps the ${ev.solved.length} states that can still reach the goal (mint) and dims the rest. It assigns each survivor the action that keeps it alive.`;
+        return `The policy generator now knows ${ev.solved.length} states are SOLVED — have a strong-cyclic policy (mint) — and the start is among them. We're closing in.`;
+      return `Sink removal: starting from the goal states and assuming the rest solved, the generator prunes any state that can be driven to a sink — leaving ${ev.solved.length} states KNOWN to be solvable (mint), the rest still unknown. Each solved state gets the action that keeps it safe.`;
     }
     case "no_policy":
       return `Proved impossible. A forward push converged at k=${ev.k}: two horizons agreed no new state can ever become solvable. No strong-cyclic policy exists — and we proved it without enumerating every plan.`;

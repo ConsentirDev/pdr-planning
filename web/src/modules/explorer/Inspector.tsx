@@ -12,6 +12,14 @@ export type Inspect =
 // the inspector is the rigorous view — show the FULL ground atom, e.g. atp(P0,L2)
 function atom(meta: Meta, l: Lit) { return meta.props[Math.abs(l) - 1] ?? `?${l}`; }
 
+// a layer cube blocks the clause ¬cube; it's a seeded mutex invariant (not learned)
+// iff that clause matches one of meta.invariants.
+function isInvariantCube(meta: Meta, cube: Lit[]): boolean {
+  const key = (xs: Lit[]) => [...xs].sort((a, b) => a - b).join(",");
+  const target = key(cube.map((l) => -l));
+  return (meta.invariants ?? []).some((inv) => key(inv) === target);
+}
+
 // render a list of signed literals as chips (¬ for negatives)
 function Lits({ meta, lits, asClause }: { meta: Meta; lits: Lit[]; asClause?: boolean }) {
   if (!lits.length) return <span className="insp-empty">∅ (empty)</span>;
@@ -54,7 +62,7 @@ export function Inspector({
       </div>
 
       <div className="insp-foot eyebrow">
-        click any <b>fence</b>, <b>⚡ reason</b>, or the <b>processing</b> state to inspect its real clauses
+        click any <b>layer</b>, <b>⚡ reason</b> / <b>⊥ invariant</b>, or the <b>processing</b> state to inspect its real clauses
       </div>
     </div>
   );
@@ -89,7 +97,7 @@ function Encoding({ meta, st, result }: { meta: Meta; st: ExplorerState; result:
           <span className="mono">S′ ⊨ F<sub>i−1</sub></span>?
         </p>
         <ul className="insp-clauses">
-          <li><b>target</b> — the next <Term k="fence">fence</Term> <span className="mono">F<sub>i−1</sub></span>’s clauses must hold in <span className="mono">S′</span></li>
+          <li><b>target</b> — the next <Term k="fence">layer</Term> <span className="mono">F<sub>i−1</sub></span>’s clauses must hold in <span className="mono">S′</span></li>
           <li><Term k="frame">frame axioms</Term> — a fluent keeps its value unless an action changes it</li>
           <li><Term k="forallstep">∀-step mutex</Term> — no two interfering actions in one step</li>
           <li><b>action laws</b> — each action implies its precondition (before) &amp; effect (after)</li>
@@ -111,23 +119,30 @@ function Encoding({ meta, st, result }: { meta: Meta; st: ExplorerState; result:
 
 function Fence({ meta, st, i }: { meta: Meta; st: ExplorerState; i: number }) {
   const clauses = st.layers[i] ?? [];
+  const nInv = clauses.filter((c) => isInvariantCube(meta, c)).length;
+  const nLearned = clauses.length - nInv;
   return (
     <>
       <p className="insp-lede">
-        <b className="mono">F{i}</b> — the <Term k="fence">fence</Term> for states ≤ <b>{i}</b>{" "}
+        <b className="mono">F{i}</b> — the <Term k="fence">layer</Term> for states ≤ <b>{i}</b>{" "}
         step{i === 1 ? "" : "s"} from the goal{i === 0 ? " (the goal itself)" : ""}. It holds{" "}
-        <b>{clauses.length}</b> learned <Term k="clause">clause{clauses.length === 1 ? "" : "s"}</Term>;
-        a state is admitted only if it satisfies all of them.
+        <b>{clauses.length}</b> <Term k="clause">clause{clauses.length === 1 ? "" : "s"}</Term>
+        {clauses.length ? <> — {nLearned} learned <Term k="reason">reason{nLearned === 1 ? "" : "s"}</Term> and{" "}
+          {nInv} seeded <Term k="invariant">mutex invariant{nInv === 1 ? "" : "s"}</Term></> : ""}.
+        A state is admitted only if it satisfies all of them.
       </p>
       {clauses.length === 0
-        ? <p className="insp-note">No clauses yet — this fence is still wide open.</p>
+        ? <p className="insp-note">No clauses yet — this layer is still wide open.</p>
         : <div className="insp-clauselist">
-            {clauses.slice(0, 24).map((cube, j) => (
-              <div key={j} className="insp-clause-row">
-                <span className="insp-clause-i num">¬cₖ{j}</span>
-                <Lits meta={meta} lits={cube.map((l) => -l)} asClause />
-              </div>
-            ))}
+            {clauses.slice(0, 24).map((cube, j) => {
+              const inv = isInvariantCube(meta, cube);
+              return (
+                <div key={j} className={`insp-clause-row ${inv ? "inv" : ""}`}>
+                  <span className="insp-clause-i num">{inv ? "⊥" : "¬c"}{j}</span>
+                  <Lits meta={meta} lits={cube.map((l) => -l)} asClause />
+                </div>
+              );
+            })}
             {clauses.length > 24 && <div className="insp-note">+{clauses.length - 24} more…</div>}
           </div>}
     </>
@@ -138,22 +153,31 @@ function Reason({ meta, st, cube }: { meta: Meta; st: ExplorerState; cube: Lit[]
   const key = cube.join(",");
   const inLayers = st.layers.map((cs, i) => (cs.some((c) => c.join(",") === key) ? i : -1)).filter((i) => i >= 0);
   const upto = inLayers.length ? Math.max(...inLayers) : 0;
+  const inv = isInvariantCube(meta, cube);
   return (
     <>
       <p className="insp-lede">
-        A <Term k="reason">learned reason</Term>: a region of states <b>proven unable</b> to reach
-        the goal within {upto} step{upto === 1 ? "" : "s"}.
+        {inv
+          ? <>A <Term k="invariant">mutex invariant</Term>: a constraint that holds in <b>every</b> reachable
+             state, computed in <b>preprocessing</b> and seeded into the layers. <b>Not</b> a learned reason —
+             it didn't come from a failed progression.</>
+          : <>An <Term k="reason">inductively-learned reason</Term>: an abstraction of a state that <b>failed
+             to progress</b>, generalised and propagated back into the layers up to {upto}.</>}
       </p>
       <div className="insp-card">
-        <div className="insp-card-h">blocked cube (the dead-end)</div>
+        <div className="insp-card-h">{inv ? "the forbidden combination (a mutex)" : "blocked cube (the failed state, abstracted)"}</div>
         <Lits meta={meta} lits={cube} />
       </div>
       <div className="insp-card">
-        <div className="insp-card-h">clause added to the fences</div>
+        <div className="insp-card-h">clause held in the layers</div>
         <Lits meta={meta} lits={cube.map((l) => -l)} asClause />
-        <p className="insp-note">pushed into <span className="mono">F0 … F{upto}</span> — every state matching
-          the cube is now excluded, so PDR never re-examines it. (<Term k="push">clause pushing</Term>
-          {" "}carries it further as the frames grow.)</p>
+        <p className="insp-note">{inv
+          ? <>holds in <span className="mono">F0 … F{upto}</span> from the start — these mutexes never come from
+             search. (Because they're not inductive, they can make the <Term k="converged">convergence</Term> test
+             slower to trigger.)</>
+          : <>added to <span className="mono">F0 … F{upto}</span> — every state matching the cube is excluded, so
+             PDR never re-examines it. <Term k="push">Clause pushing</Term> carries it further as the layers grow.</>}
+        </p>
       </div>
     </>
   );
@@ -171,8 +195,8 @@ function Obligation({ meta, st, onPick }: { meta: Meta; st: ExplorerState; onPic
     <>
       <p className="insp-lede">
         A <Term k="sat">SAT query</Term> for the <Term k="obligation">obligation</Term> at{" "}
-        <b className="mono">L{o.layer}</b>: can this state step one <Term k="fence">fence</Term> closer
-        (into <span className="mono">F{o.layer - 1}</span>)? Yes → <b>progress</b>; no → <b>learn a reason</b>.
+        <b className="mono">L{o.layer}</b>: can this state step exactly one <Term k="fence">layer</Term> closer
+        (into <span className="mono">F{o.layer - 1}</span>) in a single move? Yes → <b>progress</b>; no → <b>learn a reason</b>.
       </p>
       <div className="insp-card">
         <div className="insp-card-h">state under inspection</div>

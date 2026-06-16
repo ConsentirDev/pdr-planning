@@ -232,7 +232,7 @@ function ClassicalResultView({ trace, mode }: { trace: Trace; mode: string }) {
       <div className="pddl-main" style={{ gridTemplateColumns: `1fr ${sideW}px` }}>
         <div className="panel pddl-fences">
           <div className="panel-h">
-            <span className="eyebrow">the fences — click a fence, ⚡ reason, or the processing state to inspect</span>
+            <span className="eyebrow">the layers — click a layer, ⚡ reason / ⊥ invariant, or the processing state to inspect</span>
           </div>
           <div className="pddl-fences-body">
             <Fences meta={meta} st={st} onInspect={setInspect} selected={inspect} />
@@ -370,7 +370,7 @@ function Explainer({ isFond }: { isFond: boolean }) {
         front-end runs in Python, in your browser). If any action uses a non-deterministic{" "}
         <code>oneof</code> effect it's a <span className="hl">FOND</span> problem and routes to the
         FOND solver; otherwise classical <Term k="pdr"><span className="hl">PDR</span></Term> searches
-        backward from the goal. Once it runs, click any fence or ⚡ reason to inspect the real clauses.
+        backward from the goal. Once it runs, click any layer or ⚡ reason to inspect the real clauses.
         {isFond ? " (Your domain has oneof — this will run FOND.)" : ""}
       </p>
     </motion.div>

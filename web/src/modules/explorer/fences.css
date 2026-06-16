@@ -82,3 +82,8 @@ button.fence-cap { background: none; border: none; }
   background: rgba(58, 214, 223, 0.05);
 }
 .fence-obl .eyebrow { color: var(--cyan); }
+
+/* mutex invariants (known up-front) — distinct from amber learned-reason chips */
+.reason-chip.invariant { border-left-color: var(--cyan-dim); background: rgba(58,214,223,0.05); opacity: 0.78; }
+.reason-chip.invariant .reason-x { color: var(--cyan-dim); }
+.fences.clickable .reason-chip.invariant:hover { border-color: var(--cyan); box-shadow: var(--glow-cyan); background: rgba(58,214,223,0.1); }
