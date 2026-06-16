@@ -1,0 +1,65 @@
+.insp { padding: 14px; display: flex; flex-direction: column; gap: 0; }
+.insp-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.insp-tabs { display: flex; gap: 4px; }
+.insp-tab {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px; cursor: pointer; color: var(--tx-3);
+  background: transparent; border: 1px solid var(--line); transition: all 0.14s var(--ease);
+}
+.insp-tab:hover { color: var(--tx); }
+.insp-tab.on { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(58,214,223,0.1); }
+
+.insp-body { display: flex; flex-direction: column; gap: 12px; }
+.insp-lede { margin: 0; font-size: 13px; line-height: 1.6; color: var(--tx); }
+.insp-note { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--tx-3); }
+.insp-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--tx-3); line-height: 1.5; }
+.insp-foot b { color: var(--tx-2); font-weight: 600; }
+
+.insp-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.insp-stat {
+  display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+  padding: 7px 12px; border-radius: 10px; background: var(--ink-2); border: 1px solid var(--line);
+}
+.insp-stat b { font-size: 18px; color: var(--cyan); }
+
+.insp-card {
+  padding: 11px 12px; border-radius: 12px;
+  background: var(--ink-2); border: 1px solid var(--line);
+}
+.insp-card-h { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--cyan); margin-bottom: 8px; }
+.insp-card-h .mono { color: var(--tx); }
+.insp-math { margin: 0 0 8px; font-size: 14px; color: var(--tx); }
+.mono { font-family: var(--font-mono); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.insp-clauses { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 5px; }
+.insp-clauses li { font-size: 12.5px; line-height: 1.5; color: var(--tx-2); }
+.insp-clauses b { color: var(--tx); }
+
+.insp-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; }
+.insp-tag {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink); background: var(--cyan); border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
+}
+
+.insp-lits { display: inline; line-height: 1.9; }
+.insp-lit { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.insp-lit.pos { color: var(--mint); }
+.insp-lit.neg { color: var(--amber); }
+.insp-not { opacity: 0.85; }
+.insp-op { color: var(--tx-3); }
+.insp-empty { color: var(--tx-3); font-family: var(--font-mono); font-size: 12px; }
+
+.insp-clauselist { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.insp-clause-row { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px; border-radius: 8px; background: var(--ink-2); border: 1px solid var(--line-soft); }
+.insp-clause-i { font-size: 10px; color: var(--tx-3); flex-shrink: 0; }
+
+.insp-acts { display: flex; flex-wrap: wrap; gap: 5px; }
+.insp-act { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: var(--ink-3); border: 1px solid var(--cyan-dim); color: var(--tx); }
+
+.insp-link {
+  margin-top: 2px; align-self: flex-start; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; color: var(--cyan);
+  background: none; border: none; padding: 0;
+}
+.insp-link:hover { text-shadow: var(--glow-cyan); }

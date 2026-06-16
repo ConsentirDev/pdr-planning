@@ -55,6 +55,19 @@
 .reason-x { color: var(--amber); font-size: 11px; }
 .fence-empty { padding: 8px; text-align: center; opacity: 0.5; }
 
+/* clickable inspector affordances — buttons reset to look like the panels they replaced */
+button.fence-cap, button.reason-chip, button.fence-obl {
+  width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease), background 0.15s var(--ease);
+}
+button.fence-cap { background: none; border: none; }
+.fences.clickable .fence-cap:hover .fence-idx { color: var(--cyan-bright); text-shadow: var(--glow-cyan); }
+.fences.clickable .reason-chip:hover { border-color: var(--amber); box-shadow: var(--glow-amber); background: rgba(255,180,84,0.1); }
+.fences.clickable .fence-obl:hover { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+.reason-chip.sel { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255,180,84,0.4); background: rgba(255,180,84,0.14); }
+.fence.sel .fence-col { border-color: var(--cyan); box-shadow: inset 0 0 24px rgba(58,214,223,0.12), 0 0 0 1px var(--cyan-dim); }
+.fence.sel .fence-idx { color: var(--cyan); text-shadow: var(--glow-cyan); }
+
 .facts { display: flex; flex-wrap: wrap; gap: 4px; }
 .facts.compact { gap: 3px; }
 .fact {

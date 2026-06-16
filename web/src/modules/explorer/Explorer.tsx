@@ -8,6 +8,7 @@ import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveExplorer } from "./derive";
 import { Fences } from "./Fences";
+import { Inspector, type Inspect } from "./Inspector";
 import { WorldView } from "./WorldView";
 import { HeroDemo } from "./HeroDemo";
 import "./explorer.css";
@@ -28,6 +29,7 @@ export default function Explorer() {
   const [trace, setTrace] = useState<Trace | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [inspect, setInspect] = useState<Inspect>({ kind: "encoding" });
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
@@ -115,7 +117,7 @@ export default function Explorer() {
                 <Stats st={st!} result={trace.result} />
               </div>
               <div className="ex-fences-body">
-                <Fences meta={meta!} st={st!} />
+                <Fences meta={meta!} st={st!} onInspect={setInspect} selected={inspect} />
               </div>
             </div>
 
@@ -128,6 +130,7 @@ export default function Explorer() {
                 <NarrationFeed lines={beats} voiceOn={voiceOn} onToggleVoice={() => setVoiceOn((v) => !v)}
                   narrating={player.playing} />
               )}
+              <Inspector meta={meta!} st={st!} result={trace.result} target={inspect} onPick={setInspect} />
             </div>
           </div>
 
