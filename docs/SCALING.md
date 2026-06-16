@@ -105,12 +105,24 @@ The single remaining gap is **scale**: the evolution loop has only run on small 
 IPC instances; the bigger ones time out on the current 2-vCPU box. The concrete plan
 to close it, in order of leverage:
 
-1. **Bigger VM for a testing session.** `fly scale vm performance-8x` (8 vCPU /
-   16 GB) — or a one-off `fly machine run` — then raise the per-instance
-   `time_limit`/`k_cap` and re-run `pdr.experiments ipc` with the larger instances
-   included (blocks-10, logistics-10-0/11). Scale back to `performance-2x` (or
-   scale-to-zero) afterward so idle cost stays near nothing. The SSE stream already
-   surfaces progress on minutes-long runs.
+1. **Bigger VM for a testing session — one command.** There's a purpose-built
+   sweep that downloads a real-IPC curriculum (with a size gradient: gripper,
+   blocks-4…10, logistics-10/11), keeps the instances solvable within the budget,
+   evolves on the smaller half and **evaluates the champion on the larger held-out
+   half** (per-instance SAT-calls *and* wall-clock, coverage, multi-seed CI), writing
+   a JSON results file:
+
+   ```bash
+   fly scale vm performance-8x                          # 8 vCPU / 16 GB
+   fly ssh console -C \
+     "python -m pdr.experiments ipc-evolve --workers 8 --seeds 5 \
+        --time-limit 120 --generations 6 --out /data/ipc_evolve.json"
+   fly scale vm performance-2x                          # or `fly scale count 0`
+   ```
+
+   Raise `--time-limit` to keep the hard instances (blocks-10, logistics-10 need
+   ~30–200 s); they're auto-dropped (and reported) below the budget. Run it locally
+   for free with fewer `--workers` if you'd rather not spin the big VM.
 2. **Parallelise operator evaluation — *done*.** The `(operator × instance)` grid
    in `evolve.py` is embarrassingly parallel: `evolutionary_search(workers=N)` (or
    `python -m pdr.evolve … --workers N`) scores each generation's population across

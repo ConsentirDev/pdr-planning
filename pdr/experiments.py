@@ -178,39 +178,56 @@ def exp_fitness():
 # (#2 + #5) real IPC instances: does the operator tuned on synthetic
 #   logistics/blocks generalise to UNSEEN real IPC domains?  (held-out domains)
 # ---------------------------------------------------------------------------
-def _ensure_ipc_suite():
-    """Download a small real IPC subset (Fast Downward benchmarks) if absent, so the
-    IPC experiment is reproducible from a clean checkout."""
-    import glob
-    import json
+# explicit instance lists (Fast Downward benchmark filenames). BASE = small/easy;
+# HARD adds a real size gradient for the scale sweep (`ipc-evolve`).
+_IPC_BASE = {
+    "gripper": ["prob01.pddl", "prob02.pddl", "prob03.pddl", "prob04.pddl"],
+    "miconic": ["s1-0.pddl", "s1-1.pddl", "s1-2.pddl", "s1-3.pddl"],
+    "movie": ["prob01.pddl", "prob02.pddl"],
+}
+_IPC_HARD = {
+    "gripper": ["prob05.pddl", "prob06.pddl", "prob07.pddl", "prob08.pddl"],
+    "blocks": ["probBLOCKS-4-0.pddl", "probBLOCKS-5-0.pddl", "probBLOCKS-6-0.pddl",
+               "probBLOCKS-7-0.pddl", "probBLOCKS-8-0.pddl", "probBLOCKS-9-0.pddl",
+               "probBLOCKS-10-0.pddl"],
+    "logistics00": ["probLOGISTICS-10-0.pddl", "probLOGISTICS-11-0.pddl"],
+}
+
+
+def _ensure_ipc_suite(hard=False):
+    """Download the real IPC instances (Fast Downward benchmarks) if absent, so the
+    experiments are reproducible from a clean checkout."""
     import os
     import urllib.request
-    if glob.glob("ipc/suite/*__prob*") or glob.glob("ipc/suite/*__s*"):
-        return
     os.makedirs("ipc/suite", exist_ok=True)
     raw = "https://raw.githubusercontent.com/aibasel/downward-benchmarks/master/"
-    api = "https://api.github.com/repos/aibasel/downward-benchmarks/contents/"
 
     def fetch(url):
         return urllib.request.urlopen(
             urllib.request.Request(url, headers={"User-Agent": "pdr"}), timeout=25).read().decode()
 
-    for dom, k in {"gripper": 4, "miconic": 4, "movie": 2}.items():
+    wanted = {d: list(v) for d, v in _IPC_BASE.items()}
+    if hard:
+        for d, fs in _IPC_HARD.items():
+            wanted[d] = sorted(set(wanted.get(d, []) + fs))
+    for dom, files in wanted.items():
+        missing = [f for f in files if not os.path.exists(f"ipc/suite/{dom}__{f}")]
+        if not missing:
+            continue
         try:
-            files = sorted(f["name"] for f in json.loads(fetch(api + dom)))
-            probs = [f for f in files if f.startswith(("prob", "s")) and f.endswith(".pddl")][:k]
-            open(f"ipc/suite/{dom}__domain.pddl", "w").write(fetch(raw + f"{dom}/domain.pddl"))
-            for pf in probs:
+            if not os.path.exists(f"ipc/suite/{dom}__domain.pddl"):
+                open(f"ipc/suite/{dom}__domain.pddl", "w").write(fetch(raw + f"{dom}/domain.pddl"))
+            for pf in missing:
                 open(f"ipc/suite/{dom}__{pf}", "w").write(fetch(raw + f"{dom}/{pf}"))
         except Exception as e:  # noqa: BLE001
             print(f"  (could not fetch {dom}: {e})")
 
 
-def load_ipc(max_actions=200):
-    """The tractable real IPC instances downloaded into ipc/suite/."""
+def load_ipc(max_actions=200, hard=False):
+    """The real IPC instances downloaded into ipc/suite/, parsed + ground-action capped."""
     import glob
     import os
-    _ensure_ipc_suite()
+    _ensure_ipc_suite(hard=hard)
     from .pddl import parse_problem
     out = []
     for pf in sorted(glob.glob("ipc/suite/*__*.pddl")):
@@ -288,6 +305,96 @@ def exp_seeds(n_seeds=6):
     print("  CURATED SEED (llm-discovered-smooth), not live mutation. The CI is near-zero precisely")
     print("  because mutation rarely beats that seed in 4 generations. That is the honest finding.")
     return bests, base
+
+
+# ---------------------------------------------------------------------------
+# THE SCALE SWEEP: evolve on real IPC, evaluate the champion on a held-out
+# (larger) real-IPC test set. One command for a `fly scale vm performance-8x`
+# session; writes a JSON results file. This is the experiment that would let
+# RSI.md drop its "prototype" caveat — run it on a big box with --workers.
+# ---------------------------------------------------------------------------
+def exp_ipc_evolve(args):
+    import json
+    from .evolve import evolutionary_search, evaluate
+    from .operators import baseline_operator, seed_operators
+    tl, kc = args.time_limit, 90
+    print(f"\n=== SCALE SWEEP: evolution on REAL IPC "
+          f"(workers={args.workers}, seeds={args.seeds}, gens={args.generations}, "
+          f"time_limit={tl}s) ===")
+    insts = load_ipc(max_actions=4000, hard=True)
+    base = baseline_operator("progression")                                   # F=1
+    pdrm = next(o for o in seed_operators()["progression"] if o.name == "fixed-F3")
+    disc = next(o for o in seed_operators()["progression"] if o.name == "llm-discovered-smooth")
+
+    # probe: keep instances PDR-M F=3 solves within budget (we need a ground truth)
+    usable, dropped = [], []
+    print(f"  probing {len(insts)} real IPC instances at {tl}s/instance (PDR-M F=3):")
+    for nm, p in insts:
+        pdr = PDR(p, time_limit=tl, max_k=kc); pdrm.install(pdr)
+        t = time.perf_counter(); r = pdr.solve(); dt = time.perf_counter() - t
+        if r.solvable:
+            usable.append((nm, p)); print(f"    keep {nm:30} acts={len(p.actions):5} {dt:6.1f}s")
+        else:
+            dropped.append(nm); print(f"    drop {nm:30} acts={len(p.actions):5} (timed out)")
+    if len(usable) < 4:
+        print("  not enough tractable instances at this budget — raise --time-limit on a bigger box.")
+        return
+
+    usable.sort(key=lambda x: len(x[1].actions))
+    cut = max(2, len(usable) // 2)
+    train, test = usable[:cut], usable[cut:]
+    refs = {n: True for n, _ in test}                  # IPC benchmark instances are solvable
+    print(f"\n  train ({len(train)}, smaller): {[n for n, _ in train]}")
+    print(f"  test  ({len(test)}, larger / held-out): {[n for n, _ in test]}\n")
+
+    fixed = {"baseline F=1": base, "PDR-M F=3": pdrm, "discovered": disc}
+    fixed_ev = {name: evaluate(op, test, refs, tl, kc) for name, op in fixed.items()}
+
+    seeds_out, champ_totals = [], []
+    t0 = time.perf_counter()
+    for s in range(args.seeds):
+        best, _, _, _ = evolutionary_search(
+            seam="progression", instances=train, valid=train, generations=args.generations,
+            pop_size=8, seed=s, time_limit=tl, k_cap=kc, workers=args.workers, verbose=False)
+        cev = evaluate(best[0], test, refs, tl, kc)
+        seeds_out.append({"seed": s, "champion": best[0].name, "origin": best[0].origin,
+                          "test_sat": cev.sat_calls, "coverage": cev.coverage, "n": cev.n,
+                          "safe": cev.safe})
+        if cev.safe:
+            champ_totals.append(cev.sat_calls)
+        print(f"  seed {s}: champion={best[0].name:24} test SAT={cev.sat_calls:6} "
+              f"cov={cev.coverage}/{cev.n} safe={cev.safe}")
+    sweep_wall = time.perf_counter() - t0
+
+    print(f"\n  HELD-OUT TEST totals ({len(test)} larger real IPC instances):")
+    for name, ev in fixed_ev.items():
+        print(f"    {name:16} SAT={ev.sat_calls:7}  wall={ev.wall*1000:7.0f}ms  cov={ev.coverage}/{ev.n}")
+    if champ_totals:
+        m, lo, hi = _ci95(champ_totals)
+        print(f"    evolved champion SAT={m:7.0f}  95% CI [{lo:.0f}, {hi:.0f}]  over {len(champ_totals)} safe seeds")
+    print(f"\n  sweep wall-clock: {sweep_wall:.1f}s on {args.workers} worker(s).")
+    print("  Honest verdict: compare the evolved champion vs PDR-M F=3 on the HELD-OUT real")
+    print("  instances, in BOTH SAT-calls and wall-clock. If the champion is just the seeded")
+    print("  operator again (origin != mutation) the win is curation, not live discovery — say so.")
+
+    result = {
+        "config": {"workers": args.workers, "seeds": args.seeds, "generations": args.generations,
+                   "time_limit": tl, "engine": "minisat22"},
+        "train": [{"name": n, "actions": len(p.actions)} for n, p in train],
+        "test": [{"name": n, "actions": len(p.actions)} for n, p in test],
+        "dropped_timeout": dropped,
+        "fixed_operators": {name: {"test_sat": ev.sat_calls, "wall_ms": round(ev.wall * 1000, 1),
+                                   "coverage": ev.coverage, "n": ev.n,
+                                   "per_instance": ev.per_instance} for name, ev in fixed_ev.items()},
+        "evolved_per_seed": seeds_out,
+        "evolved_test_sat_ci": (_ci95(champ_totals) if champ_totals else None),
+        "sweep_wall_s": round(sweep_wall, 1),
+    }
+    out = args.out or "ipc_evolve_results.json"
+    with open(out, "w") as f:
+        json.dump(result, f, indent=2, default=str)
+    print(f"\n  full results written to {out}")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -369,8 +476,22 @@ def _pin_engine():
 
 
 def main(argv):
-    which = argv[1] if len(argv) > 1 else "all"
+    import argparse
+    ap = argparse.ArgumentParser(description="Reproducible experiments behind RSI.md")
+    ap.add_argument("which", nargs="?", default="all",
+                    choices=["all", "selector", "crossdomain", "parallel", "fitness",
+                             "seeds", "ipc", "ipc-evolve"],
+                    help="which experiment ('all' skips the long ipc-evolve sweep)")
+    ap.add_argument("--workers", type=int, default=1, help="parallel operator eval (ipc-evolve)")
+    ap.add_argument("--seeds", type=int, default=3, help="evolution seeds (ipc-evolve)")
+    ap.add_argument("--generations", type=int, default=5, help="generations (ipc-evolve)")
+    ap.add_argument("--time-limit", type=float, default=30.0, dest="time_limit",
+                    help="per-instance solve cap in seconds (ipc-evolve)")
+    ap.add_argument("--out", default=None, help="results JSON path (ipc-evolve)")
+    args = ap.parse_args(argv[1:])
+
     _pin_engine()
+    which = args.which
     if which in ("selector", "all"):
         exp_selector()
     if which in ("crossdomain", "all"):
@@ -383,6 +504,8 @@ def main(argv):
         exp_seeds()
     if which in ("ipc", "all"):
         exp_ipc()
+    if which == "ipc-evolve":          # the scale sweep — explicit only (long)
+        exp_ipc_evolve(args)
     print()
 
 
