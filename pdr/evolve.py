@@ -76,9 +76,13 @@ class Eval:
     def safe(self):
         return self.valid and self.coverage == self.n
 
-    def fitness(self):
-        # lower is better; unsafe operators are sent to the back.
-        return self.sat_calls if self.safe else 10 ** 12 + (self.n - self.coverage)
+    def fitness(self, by="sat"):
+        # lower is better; unsafe operators are sent to the back regardless.
+        if not self.safe:
+            return 10 ** 12 + (self.n - self.coverage)
+        # SAT calls is the reproducible default; "wall" optimises wall-clock ms
+        # instead (noisier / non-deterministic — see RSI.md #1).
+        return self.wall if by == "wall" else self.sat_calls
 
 
 def reference_table(instances, time_limit, k_cap):
@@ -298,7 +302,8 @@ def _cand_detail(o, e, split):
 
 def evolutionary_search(seam="obligation", instances=None, valid=None, generations=6,
                         pop_size=10, elite=3, scale=0.6, seed=0,
-                        time_limit=4.0, k_cap=60, archive=None, verbose=True, tracer=None):
+                        time_limit=4.0, k_cap=60, archive=None, verbose=True, tracer=None,
+                        rank_by="sat"):
     """If `valid` is given, candidates are RANKED by validation fitness (and must
     be safe on both train and validation) -- this prevents overfitting. If `valid`
     is None it defaults to `instances` (legacy single-set behaviour)."""
@@ -329,8 +334,8 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
             ev = ev_of(op)
             scored.append((op, ev))
             archive.consider(op, ev)
-        scored.sort(key=lambda x: x[1].fitness())
-        if best is None or scored[0][1].fitness() < best[1].fitness():
+        scored.sort(key=lambda x: x[1].fitness(rank_by))
+        if best is None or scored[0][1].fitness(rank_by) < best[1].fitness(rank_by):
             best = scored[0]
         history.append(best[1].sat_calls if best[1].safe else None)
         if tracer:

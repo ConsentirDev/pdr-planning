@@ -28,7 +28,11 @@ generalised to disjoint instances. That is honest research practice and the
 strongest part of the work.
 
 Everything else should be read as a **prototype on small, plan-rich demo
-domains**, with the limitations in [Methodology & threats to validity](#methodology--threats-to-validity) taken seriously — not glossed.
+domains**. The [Empirical results](#empirical-results--captured-reproducible-negatives-included)
+section reports what actually happens when you run it on real IPC instances —
+including the finding that the discovered operator generalises on SAT-calls but is
+*slower in wall-clock* than the baseline there — and [Threats to validity](#methodology--threats-to-validity)
+is not glossed. Reproduce any of it with `python3 -m pdr.experiments <name>`.
 
 ---
 
@@ -226,6 +230,75 @@ merits and labelled as such.
 
 ---
 
+## Empirical results — captured, reproducible, negatives included
+
+These came out of the third-party review. Every number below is from a live run of
+`python3 -m pdr.experiments <name>` (reproducible; small real IPC instances
+auto-download from the Fast Downward benchmark set). They are deliberately reported
+*with* their failures.
+
+### (#2 + #5) Real IPC instances, held-out domains — the headline, and it cuts both ways
+We evaluated three progression operators — baseline `F=1`, fixed PDR-M `F=3`, and the
+`llm-discovered-smooth` operator (tuned only on synthetic logistics/blocks) — on **10
+real IPC instances** (gripper, miconic, movie) the operator had **never seen**. These
+are the held-out *domains* the review asked for; gripper is structurally unlike
+logistics. Totals over the 10 instances (all solved):
+
+| operator | SAT calls | wall-clock | verdict |
+|---|---:|---:|---|
+| baseline `F=1` | 20807 | **4238 ms** | most calls, **fastest in time** |
+| PDR-M `F=3` | 9242 | 7464 ms | |
+| discovered (tuned on synthetic) | **5432** | 7426 ms | **fewest calls**, but ~1.75× slower than `F=1` |
+
+Two honest findings in one table:
+1. **The discovered operator *does* generalise** to unseen real domains on the metric
+   it was selected by — 5432 SAT calls vs 9242 (PDR-M) vs 20807 (baseline). It is not
+   merely memorising logistics.
+2. **…but SAT-calls ≠ runtime, demonstrated on real IPC.** Baseline `F=1` issues **4×
+   more SAT calls yet is the fastest in wall-clock** — because on gripper the extra
+   calls are cheap, while `F≥3` issues *fewer but harder* queries. This is exactly the
+   reviewer's #1 concern, confirmed on a substrate we did not design. **The headline
+   speed-ups are "fewer queries," not "faster planner."**
+
+### (#1) Do the two metrics agree? (`fitness`)
+On the synthetic curriculum the SAT-call-best and wall-clock-best configs agree on
+**9/10** instances (the one disagreement is a 1.06× wall penalty). So on small,
+homogeneous instances they mostly track — but the real-IPC result above shows they
+**diverge sharply** when call-cost varies across domains. We therefore keep SAT-calls
+as the **reproducible primary** (engine-pinned, noise-free) and now (a) record
+per-instance wall-clock everywhere, (b) expose a SAT-calls/wall-clock **toggle in the
+in-app bench**, and (c) added a `rank_by="wall"` option to `evolutionary_search` so the
+objective itself can be switched (noisier, non-deterministic — used with eyes open).
+
+### (#4) Multi-seed evolution, with a CI (`seeds`)
+Over 6 seeds, the evolved champion is **349 valid SAT calls, 95% CI [349, 349]**
+(7.15× vs the F=1 baseline of 2497). The zero-width CI is itself the finding: **the
+champion is the same curated seed (`llm-discovered-smooth`) on every seed** — live
+mutation does not beat it in 4 generations. So the win is **selection of a pre-found
+operator, not online discovery**, exactly as the review suspected. (Honest discovery
+would need a much larger live-LLM budget, or harder instances where the seed isn't
+already near-optimal.)
+
+### (#3) Is the L1 learner any good? We can't tell here (`selector`)
+On a 10-instance logistics+blocks pool, leave-one-out regret-vs-oracle is **1.00× for
+every selector — oracle, single-best-static, nearest-neighbour, *and* a random forest
+with proper CV**. The reason: **one config (PDR-M `F=3/4`) dominates every instance**,
+so the single-best static *is* the oracle and there is nothing for a per-instance
+selector to learn. This means the L1 "regret → 1.11×" number says **nothing about the
+learner** — it reflects a narrow demo distribution. Evaluating selection at all
+requires a diverse benchmark (ASlib / AutoFolio); the RF+CV machinery is now in place
+for when one is wired in.
+
+### (#5) Held-out domains, synthetic (`crossdomain`)
+Evolve a champion on logistics only, test on blocks only (and vice-versa). The
+logistics-tuned champion *does* transfer to blocks (**2.74× vs baseline**) but is
+**weaker than the blocks-native champion (4.55×)** — a real, measurable
+generalisation gap across domains, not a clean transfer. (On logistics both pick deep
+look-ahead and tie, so that direction is uninformative — another sign the demo pool is
+a weak test.)
+
+---
+
 ## Methodology & threats to validity
 
 Read the headline numbers through these. They are the difference between
@@ -292,17 +365,53 @@ Read the headline numbers through these. They are the difference between
 - The held-out train/validation/test discipline, with the overfitting failure and
   its fix both reproducible.
 
-**What would actually cash the cheques (in priority order):**
-1. **Make fitness wall-clock (keep SAT calls as a secondary, reproducible metric).**
-   Single biggest credibility move.
-2. **Re-run the evolution loop on the IPC subset Ava uses**, on the real backend —
-   this tests the actual claim on a substrate we didn't design.
-3. **Replace / benchmark the L1 NN learner** against random forest with proper CV,
-   and ideally off-the-shelf AutoFolio.
-4. **Report seeds and confidence intervals everywhere**; ablate curriculum order.
-5. **Write held-out *domains*, not just instances.**
-6. **Cite and position against** SATzilla, ParamILS/SMAC, AutoFolio, FunSearch,
-   AlphaEvolve, and the learning-to-branch literature throughout.
+**The review's "what would cash the cheques" list — status after the empirical pass
+above (`pdr/experiments.py`):**
+1. **Wall-clock fitness** — *partly done.* Wall-clock is now recorded per-instance,
+   shown in the bench, and selectable as the objective (`rank_by="wall"`). We keep
+   SAT-calls as the reproducible *primary*; the real-IPC result is the argument for
+   why runtime must be reported (and why we don't blindly optimise the noisy metric).
+   *Still open:* a multi-objective / repeated-measurement runtime objective.
+2. **Re-run on real IPC** — *done at small scale.* The evolution/eval now runs on real
+   IPC gripper/miconic/movie; the headline finding (generalises on calls, not on
+   runtime) is above. *Still the real gap:* the full IPC suite at scale — blocks-10
+   and logistics-10 still time out, so the loop hasn't been run on the hard instances.
+3. **RF vs NN learner with CV** — *done, but uninformative here.* Both tie the oracle
+   at 1.00× because one config dominates the demo pool. The honest conclusion is that
+   a real ASlib/AutoFolio benchmark is needed; the RF+CV harness is ready for it.
+4. **Seeds + CIs** — *done.* Reported above; the zero-width CI exposed that the win is
+   a curated seed, not live discovery. *Still open:* curriculum-order ablation at scale.
+5. **Held-out domains** — *done* (real IPC gripper/miconic + synthetic logistics→blocks),
+   with a measured transfer gap. *Stronger version still open:* a domain-stratified
+   benchmark suite.
+6. **Cite and position against prior art** — *done* (table above + references below).
+
+The remaining true gap is **scale**: every result here is on small instances
+(the hard IPC ones time out), single-machine, with the objective a reproducible proxy.
+That is the honest line between "a credible, self-aware prototype" and "a result."
+
+---
+
+## References (the prior art this is measured against)
+
+- **PDR / IC3.** A. Bradley, *SAT-Based Model Checking without Unrolling*, VMCAI 2011.
+  (The model-checking algorithm Ava's thesis adapts to planning.)
+- **Algorithm configuration.** F. Hutter, H. Hoos, K. Leyton-Brown, T. Stützle,
+  *ParamILS*, JAIR 2009; F. Hutter, H. Hoos, K. Leyton-Brown, *Sequential
+  Model-Based Optimization (SMAC)*, LION 2011.
+- **Per-instance algorithm selection.** L. Xu, F. Hutter, H. Hoos, K. Leyton-Brown,
+  *SATzilla*, JAIR 2008; M. Lindauer, H. Hoos, F. Hutter, T. Schaub, *AutoFolio*,
+  JAIR 2015; L. Xu, H. Hoos, K. Leyton-Brown, *Hydra*, AAAI 2010.
+- **Learning to branch / search.** E. Khalil, P. Le Bodic, L. Song, G. Nemhauser,
+  B. Dilkina, *Learning to Branch in MILP*, AAAI 2016; M. Gasse et al., *Exact
+  Combinatorial Optimization with GNNs*, NeurIPS 2019.
+- **Verifier-grounded program synthesis.** B. Romera-Paredes et al., *FunSearch*,
+  Nature 2024; *AlphaEvolve*, DeepMind 2025.
+
+This layer plumbs (configuration → selection → verifier-grounded synthesis) into PDR
+with a soundness-preserving verifier and a held-out criterion. It does not yet
+benchmark against any of the above; doing so is the work that would make the
+comparison earned rather than asserted.
 
 ---
 
