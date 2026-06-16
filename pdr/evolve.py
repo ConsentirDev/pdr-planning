@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .pdr import PDR
 from .planning import validate_plan
@@ -70,6 +70,7 @@ class Eval:
     valid: bool
     train_sat: int = 0    # training-set SAT calls (reporting only)
     valid_sat: int = 0    # validation-set SAT calls (== sat_calls when split)
+    per_instance: dict = field(default_factory=dict)  # {name: {sat, ok, note}}
 
     @property
     def safe(self):
@@ -123,6 +124,7 @@ def _evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
     cov = sat = 0
     wall = 0.0
     valid = True
+    per = {}                                # per-instance breakdown for deep-dives
     for name, prob in instances:
         pdr = PDR(prob, time_limit=time_limit, max_k=k_cap)
         operator.install(pdr)
@@ -131,17 +133,24 @@ def _evaluate(operator: Operator, instances, refs, time_limit=4.0, k_cap=60):
             res = pdr.solve()
         except Exception:
             valid = False
+            per[name] = {"sat": None, "ok": False, "note": "error"}
             continue
         wall += time.perf_counter() - t0
         if res.solvable is None:           # timed out -> not covered
+            per[name] = {"sat": None, "ok": False, "note": "timeout"}
             continue
+        ok = True
         if res.solvable != refs[name]:     # wrong answer -> unsafe
-            valid = False
+            valid = False; ok = False
         if res.solvable and not validate_plan(prob, res.plan):
-            valid = False                  # invalid plan -> unsafe
+            valid = False; ok = False      # invalid plan -> unsafe
         cov += 1
-        sat += res.stats["sat_calls"]
-    return Eval(cov, len(instances), sat, wall, valid, train_sat=sat, valid_sat=sat)
+        sc = res.stats["sat_calls"]
+        sat += sc
+        per[name] = {"sat": sc, "ok": ok, "note": "solved" if res.solvable else "proved-unsat"}
+    e = Eval(cov, len(instances), sat, wall, valid, train_sat=sat, valid_sat=sat)
+    e.per_instance = per
+    return e
 
 
 def evaluate_split(operator, train, valid, refs_t, refs_v, time_limit=4.0, k_cap=60):
