@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { Term } from "../../lib/ui/Term";
 import type { Ev, Trace, PdrResult } from "../../lib/trace/types";
 
 type Domain = "logistics" | "blocksworld";
@@ -85,8 +86,9 @@ export function RaceTab({ mode }: { mode: string }) {
         <div className="panel rd-banner">
           <span className="eyebrow">the race</span>
           <p>
-            Three solvers attack the <em>same</em> problem with different look-ahead.{" "}
-            <span className="hl">baseline</span> asks one SAT question at a time;{" "}
+            Three solvers attack the <em>same</em> problem with different{" "}
+            <Term k="lookahead">look-ahead</Term>.{" "}
+            <span className="hl">baseline</span> asks one <Term k="sat">SAT</Term> question at a time;{" "}
             <span className="hl" style={{ color: "var(--violet)" }}>PDR-M (F=3)</span> and{" "}
             <span className="hl-mint">PDR-IL (F=2)</span> peek several fences ahead. Fewer SAT calls = smarter search.
             {domain === "logistics" && " On Logistics, PDR-M sometimes nails it in a single call."}

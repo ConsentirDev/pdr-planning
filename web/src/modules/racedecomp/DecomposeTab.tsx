@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { Term } from "../../lib/ui/Term";
 import type { Ev, Trace } from "../../lib/trace/types";
 
 type Domain = "logistics" | "fuel";
@@ -136,9 +137,9 @@ export function DecomposeTab({ mode }: { mode: string }) {
         <div className="panel rd-banner">
           <span className="eyebrow">decompose</span>
           <p>
-            Instead of solving the whole goal at once, the planner splits it into{" "}
-            <span className="hl">independent chunks</span>, solves each as a mini-problem, then{" "}
-            <span className="hl-mint">glues</span> the plans together.
+            Instead of solving the whole goal at once, the planner{" "}
+            <Term k="decomposition">splits it into <span className="hl">independent chunks</span></Term>,
+            solves each as a mini-problem, then <span className="hl-mint">glues</span> the plans together.
             {domain === "fuel"
               ? " But fuel is shared: the glue FAILS on a fuel proposition, so the chunks must MERGE and re-solve as one."
               : " When the chunks don't share a scarce resource, the glue just works."}

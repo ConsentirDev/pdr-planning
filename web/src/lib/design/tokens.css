@@ -250,3 +250,15 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .bp-aura, .shine, .rise, .rise-2, .rise-3 { animation: none !important; }
 }
+
+/* drag-to-resize handle for side panels (the "show the working" / explainer panes) */
+.pane-resize {
+  position: absolute; left: -9px; top: 0; bottom: 0; width: 10px; z-index: 6;
+  cursor: col-resize;
+}
+.pane-resize::after {
+  content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 44px; border-radius: 3px; background: var(--line);
+  transition: background 0.15s var(--ease), box-shadow 0.15s var(--ease), height 0.15s var(--ease);
+}
+.pane-resize:hover::after { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); height: 64px; }

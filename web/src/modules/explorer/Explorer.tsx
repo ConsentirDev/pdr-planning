@@ -4,6 +4,7 @@ import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
 import { NarrationFeed, buildBeats, useGuidedNarration } from "../../lib/ui/NarrationFeed";
+import { useResizableWidth } from "../../lib/ui/useResizableWidth";
 import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import { deriveExplorer } from "./derive";
@@ -30,6 +31,7 @@ export default function Explorer() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [inspect, setInspect] = useState<Inspect>({ kind: "encoding" });
+  const { width: sideW, startDrag } = useResizableWidth("ex-side-w", 380);
 
   const events = (trace?.events ?? []) as Ev[];
   const meta = trace?.meta as Meta | undefined;
@@ -110,7 +112,7 @@ export default function Explorer() {
         <Welcome mode={mode} busy={busy} />
       ) : (
         <>
-          <div className="ex-main">
+          <div className="ex-main" style={{ gridTemplateColumns: `1fr ${sideW}px` }}>
             <div className="ex-fences panel">
               <div className="panel-h">
                 <div><span className="eyebrow">the fences</span> <span className="ex-h-sub">reachability layers, learned backward from the goal</span></div>
@@ -122,6 +124,7 @@ export default function Explorer() {
             </div>
 
             <div className="ex-side">
+              <div className="pane-resize" onMouseDown={startDrag} title="drag to resize" />
               <div className="panel ex-world">
                 <div className="panel-h"><span className="eyebrow">world · state under inspection</span></div>
                 <WorldView meta={meta!} state={st?.current?.state ?? meta!.init} />

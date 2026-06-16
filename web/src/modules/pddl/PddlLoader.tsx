@@ -3,12 +3,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { useResizableWidth } from "../../lib/ui/useResizableWidth";
+import { Term } from "../../lib/ui/Term";
 import type { Ev, Meta, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
-// Reuse the Explorer's renderers to draw classical results identically.
+// Reuse the Explorer's renderers (incl. the Inspector) to draw classical results identically.
 import { Fences } from "../explorer/Fences";
 import { WorldView } from "../explorer/WorldView";
 import { deriveExplorer } from "../explorer/derive";
+import { Inspector, type Inspect } from "../explorer/Inspector";
 import { SAMPLES, LOGISTICS, type PddlSample } from "./samples";
 import "./pddl.css";
 
@@ -209,6 +212,8 @@ function ClassicalResultView({ trace, mode }: { trace: Trace; mode: string }) {
   const solvable: boolean | null = result?.solvable ?? null;
   const planLen = result?.plan?.length ?? (st.plan ? st.plan.length : 0);
   const curEvent = player.cursor >= 0 ? events[player.cursor] : null;
+  const [inspect, setInspect] = useState<Inspect>({ kind: "encoding" });
+  const { width: sideW, startDrag } = useResizableWidth("pddl-side-w", 340);
 
   return (
     <div className="pddl-result">
@@ -224,23 +229,25 @@ function ClassicalResultView({ trace, mode }: { trace: Trace; mode: string }) {
         <span className="chip" style={{ marginLeft: "auto" }}>{meta.name}</span>
       </div>
 
-      <div className="pddl-main">
+      <div className="pddl-main" style={{ gridTemplateColumns: `1fr ${sideW}px` }}>
         <div className="panel pddl-fences">
           <div className="panel-h">
-            <span className="eyebrow">the fences — reachability layers learned backward from the goal</span>
+            <span className="eyebrow">the fences — click a fence, ⚡ reason, or the processing state to inspect</span>
           </div>
           <div className="pddl-fences-body">
-            <Fences meta={meta} st={st} />
+            <Fences meta={meta} st={st} onInspect={setInspect} selected={inspect} />
           </div>
         </div>
 
         <div className="pddl-side">
+          <div className="pane-resize" onMouseDown={startDrag} title="drag to resize" />
           <div className="panel pddl-world">
             <div className="panel-h">
               <span className="eyebrow">world · state under inspection</span>
             </div>
             <WorldView meta={meta} state={st.current?.state ?? meta.init} />
           </div>
+          <Inspector meta={meta} st={st} result={trace.result} target={inspect} onPick={setInspect} />
           {mode === "lab" && <LabStats trace={trace} />}
         </div>
       </div>
@@ -358,11 +365,12 @@ function Explainer({ isFond }: { isFond: boolean }) {
         action schemas; a <code>problem</code> lists the objects, the initial state and the goal.
       </p>
       <p>
-        This is the <em>same verified solver</em> you saw in the Explorer — only now it parses and
-        grounds <em>your</em> problem (the PDDL front-end runs in Python, in your browser). If any
-        action uses a non-deterministic <code>oneof</code> effect it's a{" "}
-        <span className="hl">FOND</span> problem and routes to the FOND solver; otherwise classical{" "}
-        <span className="hl">PDR</span> searches backward from the goal.
+        This is the <em>same verified solver</em> you saw in the Explorer — only now it parses and{" "}
+        <Term k="grounding"><span className="hl">grounds</span></Term> <em>your</em> problem (the PDDL
+        front-end runs in Python, in your browser). If any action uses a non-deterministic{" "}
+        <code>oneof</code> effect it's a <span className="hl">FOND</span> problem and routes to the
+        FOND solver; otherwise classical <Term k="pdr"><span className="hl">PDR</span></Term> searches
+        backward from the goal. Once it runs, click any fence or ⚡ reason to inspect the real clauses.
         {isFond ? " (Your domain has oneof — this will run FOND.)" : ""}
       </p>
     </motion.div>

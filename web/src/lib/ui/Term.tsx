@@ -1,8 +1,11 @@
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./term.css";
 
 // A hover/focus glossary popover. Wrap any technical term: <Term k="obligation">.
 // Definitions are written for a planning-literate reader and cite the thesis, so
-// an expert hovering anything sees we mean the real thing.
+// an expert hovering anything sees we mean the real thing. The popover renders in
+// a portal with viewport clamping, so it can never be clipped by a panel.
 export const GLOSSARY: Record<string, { label: string; def: string; ref?: string }> = {
   pdr: {
     label: "PDR / IC3",
@@ -60,19 +63,57 @@ export const GLOSSARY: Record<string, { label: string; def: string; ref?: string
     label: "frame axiom",
     def: "A constraint saying a fluent keeps its value across a step unless an applied action changes it. Without frame axioms the encoding could “teleport” the state.",
   },
+  lookahead: {
+    label: "look-ahead depth (F)",
+    def: "How many ∀-step transitions one obligation expands per SAT call. F=1 is baseline PDR; PDR-M with larger F peeks several fences ahead — more SAT work per call, but fewer calls overall. PDR-IL interleaves layers.",
+    ref: "PDR-M / PDR-IL, Ch 3",
+  },
+  decomposition: {
+    label: "decomposition (PD-PDR)",
+    def: "Split the goal into independent sub-goals via a dependency graph, solve each as a small sub-problem, then concatenate the plans. If two sub-plans conflict over a shared resource (e.g. fuel), the offending parts are MERGED and re-solved as one.",
+    ref: "Ch 5",
+  },
+  grounding: {
+    label: "grounding",
+    def: "Instantiating a lifted PDDL domain (action schemas with variables) into concrete ground actions and propositions over the problem's objects — the Boolean variables the SAT encoding then operates on.",
+  },
 };
+
+const POP_W = 300;
 
 export function Term({ k, children }: { k: keyof typeof GLOSSARY | string; children?: React.ReactNode }) {
   const g = GLOSSARY[k];
+  const ref = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number; above: boolean } | null>(null);
+
+  const show = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    // clamp horizontally so the (centred) box stays on screen
+    const half = POP_W / 2 + 10;
+    const x = Math.max(half, Math.min(window.innerWidth - half, r.left + r.width / 2));
+    const above = r.top > 230; // open upward if there's room, else downward
+    setPos({ x, y: above ? r.top - 8 : r.bottom + 8, above });
+  }, []);
+  const hide = useCallback(() => setPos(null), []);
+
   if (!g) return <>{children ?? k}</>;
   return (
-    <span className="term" tabIndex={0}>
-      {children ?? g.label}
-      <span className="term-pop" role="tooltip">
-        <span className="term-pop-label">{g.label}</span>
-        <span className="term-pop-def">{g.def}</span>
-        {g.ref && <span className="term-pop-ref">📑 {g.ref}</span>}
+    <>
+      <span ref={ref} className="term" tabIndex={0}
+        onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+        {children ?? g.label}
       </span>
-    </span>
+      {pos && createPortal(
+        <span className={`term-pop ${pos.above ? "above" : "below"}`} role="tooltip"
+          style={{ left: pos.x, top: pos.y }}>
+          <span className="term-pop-label">{g.label}</span>
+          <span className="term-pop-def">{g.def}</span>
+          {g.ref && <span className="term-pop-ref">📑 {g.ref}</span>}
+        </span>,
+        document.body,
+      )}
+    </>
   );
 }

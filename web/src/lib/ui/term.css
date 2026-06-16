@@ -1,28 +1,25 @@
 .term {
-  position: relative; cursor: help;
-  border-bottom: 1px dotted var(--cyan-dim); color: inherit; outline: none;
+  cursor: help; border-bottom: 1px dotted var(--cyan-dim); color: inherit; outline: none;
 }
 .term:hover, .term:focus { color: var(--cyan-bright); border-bottom-color: var(--cyan); }
 
+/* rendered in a portal on <body>; positioned via inline left/top, clamped to the
+   viewport, so a panel's overflow can never clip it */
 .term-pop {
-  position: absolute; left: 50%; bottom: calc(100% + 9px); transform: translateX(-50%) translateY(4px);
-  width: 290px; z-index: 60; pointer-events: none;
+  position: fixed; z-index: 9999; width: 300px; pointer-events: none;
   display: flex; flex-direction: column; gap: 6px;
   padding: 12px 14px; border-radius: 12px; text-align: left;
   background: linear-gradient(180deg, rgba(20,29,41,0.99), rgba(11,16,24,0.99));
   border: 1px solid var(--cyan-dim);
   box-shadow: 0 24px 60px -20px #000, 0 0 0 1px rgba(58,214,223,0.1);
-  opacity: 0; visibility: hidden; transition: opacity 0.16s var(--ease), transform 0.16s var(--ease);
+  transform: translateX(-50%);
+  animation: termFade 0.12s var(--ease);
 }
-.term:hover .term-pop, .term:focus .term-pop {
-  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
-}
-.term-pop::after {
-  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border: 6px solid transparent; border-top-color: var(--cyan-dim);
-}
+.term-pop.above { transform: translateX(-50%) translateY(-100%); }
+@keyframes termFade { from { opacity: 0; } to { opacity: 1; } }
+
 .term-pop-label { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--cyan); letter-spacing: 0.02em; }
 .term-pop-def { font-size: 12.5px; line-height: 1.5; color: var(--tx); }
 .term-pop-ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--tx-3); letter-spacing: 0.04em; }
 
-@media (max-width: 760px) { .term-pop { width: 220px; } }
+@media (max-width: 760px) { .term-pop { width: 240px; } }
