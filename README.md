@@ -3,9 +3,13 @@
 A faithful, fully-tested, runnable reproduction of **all six technical chapters**
 of Ava Clifton's PhD thesis *"Advancing Property Directed Reachability for
 Classical and Fully Observable Nondeterministic Planning"* (ANU, 2025) — together
-with a **recursive self-improvement stack (L0–L3)** built on top of it: a system
-that not only *configures* the planner but *evolves new search operators* for it,
-scored by a verifiable harness so it can never trade correctness for speed.
+with an experimental **self-improvement layer** built on top of it: a known stack
+(algorithm configuration → per-instance selection → verifier-grounded operator
+synthesis) plumbed into PDR, so it not only *configures* the planner but, on one
+seam, *synthesises* a new search operator — scored by a verifiable harness, so a
+candidate can only ever be slower, never wrong. It is a **prototype on small demo
+domains**; the design doc [`pdr/RSI.md`](pdr/RSI.md) is candid about exactly what
+that does and doesn't show (fitness is SAT-calls not runtime, single-seed, etc.).
 
 [![ci](https://img.shields.io/badge/tests-28%20passing-brightgreen)](pdr/tests.py)
 [![python](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
@@ -89,8 +93,8 @@ python -m pdr.benchmark --mode speedup     # Ch 3 speedup factors
 python -m pdr.benchmark --mode compare     # coverage + time across solvers
 python -m pdr.benchmark --mode fond        # FOND-PDR vs ground truth
 
-# recursive self-improvement
-python -m pdr.selfimprove                   # L0/L1 self-configuring portfolio
+# self-improvement layer (prototype — see pdr/RSI.md for honest scope)
+python -m pdr.selfimprove                   # L0/L1 config + per-instance selection
 python -m pdr.evolve --mode evolve --seam progression   # L2 evolve an operator
 python -m pdr.evolve --mode llm   --seam reason         # L2 LLM-in-the-loop (offline-capable)
 python -m pdr.evolve --mode meta                        # L3 improve the improver

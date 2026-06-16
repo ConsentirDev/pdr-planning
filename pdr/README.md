@@ -2,8 +2,9 @@
 
 A working, tested, benchmarkable reproduction of **all six technical chapters**
 of Ava Clifton's PhD thesis, *"Advancing Property Directed Reachability for
-Classical and Fully Observable Nondeterministic Planning"* (ANU, 2025) — plus a
-**recursive self-improvement** layer that pushes the ideas further.
+Classical and Fully Observable Nondeterministic Planning"* (ANU, 2025) — plus an
+experimental **self-improvement** layer that pushes the ideas further (a prototype;
+[`RSI.md`](RSI.md) is candid about its scope and limits).
 
 Runs on any laptop with just Python. It uses the fast `python-sat` solver if
 present, otherwise a built-in pure-Python one — either way it just works.
@@ -84,7 +85,7 @@ setting to use for which problem, and gets better every round (see `RSI.md`).
 | §6.3 policy generator (Algorithm 5) | `fond.py` `compute_policy` | sink-removal + backward strong-cyclic extraction |
 | §3.3 / §5.4 / §6.6 evaluation | `benchmark.py` | speedup factors, coverage, FOND |
 | Examples 1/4, 2/9, 7, 8 | `domains.py` | the thesis's own running examples, parameterised |
-| **beyond the thesis** | `selfimprove.py`, `RSI.md` | recursive self-improvement |
+| **beyond the thesis** | `selfimprove.py`, `RSI.md` | self-improvement layer (prototype) |
 
 ### Faithfulness & correctness (why you can trust it)
 - All five ∀-step schemas, the FOND Schemas 6–15, reason minimisation,
@@ -119,7 +120,7 @@ setting to use for which problem, and gets better every round (see `RSI.md`).
 
 ---
 
-## Part 3 — Pushing it further: recursive self-improvement
+## Part 3 — Pushing it further: a self-improvement layer (prototype)
 
 The thesis's key empirical finding is that **no single configuration dominates** —
 PDR-M, PDR-IL, F, rescheduling, parallelism, decomposition each win on some
@@ -140,21 +141,26 @@ round 3: capability=6  policy_regret=1.12x
 round 4: capability=7  policy_regret=1.11x   # broader AND sharper every round
 ```
 
-And it doesn't stop at picking knobs — it **invents new search operators**:
+And it doesn't stop at picking knobs — on one seam it **synthesises a new search
+operator** (verifier-grounded program synthesis, FunSearch/AlphaEvolve in spirit):
 
-* **L2 (`evolve.py`)** evolves PDR's tie-breaking / reason-ordering strategies,
-  scored by the verifiable harness. The seams are soundness-preserving by
-  construction, so a candidate can only be *slower*, never *wrong* — the safety
-  gate can't be cheated. It autonomously discovers a reason-ordering operator at
-  **1.22× fewer SAT calls** (and **1.19× on held-out instances** — it
-  generalises), and runs LLM-in-the-loop (Anthropic API, or offline with curated
-  Claude-authored proposals).
-* **L3 (`--mode meta`)** improves the improver: it *learns which seam has
-  leverage* (reason ≈1.3× ≫ obligation ≈1.0×) and concentrates its budget there,
-  auto-expands the curriculum, and adapts its own mutation scale.
+* **L2 (`evolve.py`)** searches PDR's tie-breaking / reason-ordering / progression
+  strategies, scored by the verifiable harness. The seams are soundness-preserving
+  by construction, so a candidate can only be *slower*, never *wrong*. On the
+  reason seam it re-derives a known-good ordering (**1.22× fewer SAT calls**,
+  1.19× held-out) — *confirmation* of a thesis hint, not new discovery; the
+  obligation seam shows ~1.0× (a reported null result). On the **progression**
+  seam — operationalising Ava's §7.2 conjecture of online-adaptive macro length —
+  it finds an adaptive look-ahead that beats fixed PDR-M (F=3). Runs
+  LLM-in-the-loop (Anthropic API, or offline with curated proposals).
+* **L3 (`--mode meta`)** meta-search over the search's own knobs: it learns which
+  seam has leverage and concentrates budget there, auto-expands the curriculum, and
+  adapts its mutation scale.
 
-`RSI.md` is the full write-up — the ladder L0→L3, what's measured, and the next
-frontier (wider seams, transferring learned reasons, self-authored features).
+> Read these as **SAT-call** reductions on **small demo domains**, single-seed —
+> not "faster planner" and not benchmark results. [`RSI.md`](RSI.md) is the honest
+> write-up: prior-art positioning, the SAT-calls≠runtime caveat, a soundness lemma,
+> and a Threats-to-validity section.
 
 ---
 
