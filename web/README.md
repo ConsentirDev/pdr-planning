@@ -7,6 +7,11 @@ reimplementation), so it's instantly shareable.
 
 > A companion to Ava Clifton's thesis. Aesthetic: "blueprint / watch-it-think".
 
+**Live:** the frontend is deployed at **watch-it-think.vercel.app** (Vercel), backed
+by a real solver service at **pdr-visualized.fly.dev** (Fly.io, Lingeling). On first
+visit you'll meet a deliberately silly login gauntlet (the "Reachability Checkpoint")
+— it's theatre, not security; the real gate is the backend token. See `../DEPLOY.md`.
+
 ## Run it locally
 
 ```bash
@@ -21,25 +26,39 @@ planner.
 
 ## Modules
 - **PDR Explorer** — watch the reachability "fences" learn backward from the goal;
-  animated logistics/blocksworld worlds, the obligation queue, the plan assembling.
+  animated logistics/blocksworld worlds, the plan assembling. Click any fence, ⚡
+  reason, or the processing state to open the **Inspector** — the real CNF clauses,
+  the ∀-step SAT encoding, and thesis citations. Hover any term for a glossary popover.
 - **FOND Policies** — the AND/OR graph growing, the sink-removal policy generator,
-  strong-cyclic policies (and proofs that none exist).
-- **Self-Improvement Lab** — evolve new search operators; the leaderboard, the
-  discovered operator's code, and the train→validation→test (overfitting) story.
+  strong-cyclic policies (and proofs that none exist). Eight domains incl. several
+  from Ava's FOND benchmark set — Triangle-Tireworld, Faults, Islands, First-Responders,
+  Earth-Observation (a satellite) — each with a bespoke per-state visualization.
+- **Self-Improvement Lab** — an *experimental layer on top of* the thesis (not part of
+  it). Watch evolution stream generation-by-generation; click any candidate to see its
+  lineage, the exact weight diff, and the held-out scores. A **Bench** tab (Lab mode)
+  lets you queue operators/runs and compare two **per-instance**, with a SAT-calls ⇄
+  wall-clock toggle. The honest framing and results live in `../pdr/RSI.md`.
 - **Race & Decompose** — variants head-to-head; problems split into chunks and
   glued back (with merge-on-failure).
-- **PDDL Loader** — paste/upload real PDDL; it's parsed, grounded, and solved by
-  the same engine.
+- **PDDL Loader** — paste/upload real PDDL (incl. a real IPC-2000 logistics instance);
+  it's parsed, grounded, and solved by the same engine.
 
 ## Optional fast backend
-Pyodide uses the pure-Python SAT solver (great for sharing, slower on big
-problems). For speed, run the FastAPI backend and the app auto-detects it:
+Pyodide uses the pure-Python SAT solver (great for sharing, slower on big problems).
+For speed — and for anything beyond toy sizes — run the FastAPI backend and the app
+auto-detects it (badge shows **server**):
 
 ```bash
 pip install -e ".[sat]" fastapi uvicorn   # from the repo root
 uvicorn server.app:app --port 8000
 ```
-The runtime badge (top-right) will show **backend connected**.
+
+The same backend is deployed on Fly.io (Lingeling) and powers the live site. It adds:
+`/run-stream` (Server-Sent Events — per-generation progress for the slow evolution
+runs), optional token auth (`API_TOKEN` ⇄ frontend `VITE_API_TOKEN`), and
+`ALLOW_ORIGINS` CORS locking. Point the frontend at a deployed backend with
+`VITE_BACKEND_URL`. Full instructions: `../DEPLOY.md`; the container is `../Dockerfile`
++ `../fly.toml`.
 
 ## Build & deploy (static, zero-config)
 ```bash

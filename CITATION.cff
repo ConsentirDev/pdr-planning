@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite both the software and the underlying thesis."
-title: "pdr-planning: a runnable reproduction of PDR for classical & FOND planning with recursive self-improvement"
+title: "pdr-planning: a runnable reproduction of PDR for classical & FOND planning, with a verifier-grounded self-improvement layer"
 version: 0.1.0
-date-released: 2026-06-13
+date-released: 2026-06-16
 authors:
   - given-names: Jordan
     affiliation: "Intrinsic Solutions"
@@ -12,7 +12,9 @@ keywords:
   - property directed reachability
   - IC3
   - FOND planning
-  - recursive self-improvement
+  - algorithm configuration
+  - algorithm selection
+  - verifier-grounded program synthesis
 references:
   - type: thesis
     title: "Advancing Property Directed Reachability for Classical and Fully Observable Nondeterministic Planning"
