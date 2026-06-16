@@ -86,6 +86,48 @@ class Runtime {
       this.worker!.postMessage({ type: "run", id, spec });
     });
   }
+
+  // Like run(), but streams live progress events (e.g. per-generation for the
+  // evolution module) via Server-Sent Events while the backend computes — so the
+  // slow runs show themselves advancing. Falls back to a single run() on Pyodide
+  // (no backend) where there's no stream; onProgress simply isn't called.
+  async runStream(spec: Spec, onProgress: (ev: any) => void): Promise<Trace> {
+    await this.boot();
+    if (!this.backendOk) return this.run(spec); // pyodide: no live stream available
+    const r = await fetch(`${BACKEND}/run-stream`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(API_TOKEN ? { "x-api-key": API_TOKEN } : {}) },
+      body: JSON.stringify(spec),
+    });
+    if (r.status === 401) throw new Error("backend rejected the API token (401)");
+    if (!r.ok || !r.body) throw new Error(`backend error ${r.status}`);
+
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let final: Trace | null = null;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, sep); buf = buf.slice(sep + 2);
+        let event = "message", data = "";
+        for (const ln of frame.split("\n")) {
+          if (ln.startsWith("event:")) event = ln.slice(6).trim();
+          else if (ln.startsWith("data:")) data += ln.slice(5).trim();
+        }
+        if (!data) continue;
+        const payload = JSON.parse(data);
+        if (event === "event") onProgress(payload);
+        else if (event === "result") final = payload as Trace;
+        else if (event === "error") throw new Error(payload?.message || "stream error");
+      }
+    }
+    if (!final) throw new Error("the stream ended without a result");
+    return final;
+  }
 }
 
 function fetchTimeout(url: string, ms: number) {

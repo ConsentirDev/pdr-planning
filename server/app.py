@@ -25,10 +25,14 @@ Auth (optional, for a public deploy):
 
 from __future__ import annotations
 
+import json
 import os
+import queue
+import threading
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from pdr.web import run_trace, catalog
@@ -86,3 +90,41 @@ def get_catalog(_: None = Depends(require_token)):
 @app.post("/run")
 def run(spec: Spec, _: None = Depends(require_token)):
     return run_trace(spec.model_dump(exclude_none=True))
+
+
+@app.post("/run-stream")
+def run_stream(spec: Spec, _: None = Depends(require_token)):
+    """Server-Sent Events: stream live progress (currently per-generation events
+    for the evolution module) while the run computes, then a final `result`. The
+    heavy evolve run is the reason this exists — minutes-long, so the UI must show
+    it advancing rather than freezing. Runs the work in a thread and drains a queue."""
+    q: "queue.Queue" = queue.Queue(maxsize=20000)
+    DONE = object()
+    payload = spec.model_dump(exclude_none=True)
+
+    def on_event(ev):
+        q.put(("event", ev))
+
+    def work():
+        try:
+            q.put(("result", run_trace(payload, on_event=on_event)))
+        except Exception as e:  # noqa: BLE001 — surface any failure to the client
+            q.put(("error", {"message": str(e)}))
+        finally:
+            q.put((DONE, None))
+
+    threading.Thread(target=work, daemon=True).start()
+
+    def sse():
+        # tell proxies to flush immediately
+        yield ": stream open\n\n"
+        while True:
+            kind, data = q.get()
+            if kind is DONE:
+                break
+            yield f"event: {kind}\ndata: {json.dumps(data, default=str)}\n\n"
+
+    return StreamingResponse(sse(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "Connection": "keep-alive",
+                                      "X-Accel-Buffering": "no"})

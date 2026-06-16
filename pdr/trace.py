@@ -36,15 +36,22 @@ def parse_atom(name):
 class Tracer:
     """Append-only event sink. `cube()` serialises a frozenset of abstract lits."""
 
-    def __init__(self, enabled=True, max_events=300_000):
+    def __init__(self, enabled=True, max_events=300_000, on_emit=None):
         self.enabled = enabled
         self.events = []
         self.max_events = max_events
+        self.on_emit = on_emit   # optional callback(event) for live streaming
 
     def emit(self, kind, **data):
         if not self.enabled or len(self.events) >= self.max_events:
             return
-        self.events.append({"t": kind, **data})
+        ev = {"t": kind, **data}
+        self.events.append(ev)
+        if self.on_emit is not None:
+            try:
+                self.on_emit(ev)
+            except Exception:
+                pass
 
     @staticmethod
     def cube(c):

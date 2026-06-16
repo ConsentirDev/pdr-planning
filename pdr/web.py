@@ -84,7 +84,7 @@ def _is_fond(prob):
 # ---------------------------------------------------------------------------
 # the dispatcher
 # ---------------------------------------------------------------------------
-def run_trace(spec):
+def run_trace(spec, on_event=None):
     module = spec.get("module", "pdr")
     handler = {
         "pdr": _run_pdr, "race": _run_race, "fond": _run_fond,
@@ -92,6 +92,9 @@ def run_trace(spec):
     }.get(module)
     if handler is None:
         raise ValueError(f"unknown module {module!r}")
+    # only evolution streams live per-generation progress; others are fast
+    if on_event is not None and module == "evolve":
+        return _json(handler(spec, on_event=on_event))
     return _json(handler(spec))
 
 
@@ -153,7 +156,7 @@ def _run_decomp(spec):
                        "stats": res.stats}}
 
 
-def _run_evolve(spec):
+def _run_evolve(spec, on_event=None):
     # imported lazily: evolution is heavier and only this module needs it
     from .evolve import evolutionary_search, train_valid_split, build_instances, instance_pool
     cfg = spec.get("config", {}) or {}
@@ -165,7 +168,13 @@ def _run_evolve(spec):
         train, valid = train_valid_split()
     else:
         train, valid = build_instances(instance_pool()[:4]), None
-    tr = Tracer(max_events=40000)
+    # on_event streams each generation live (JSON-sanitised) for the progress UI
+    stream = None
+    if on_event is not None:
+        def stream(ev):
+            if ev.get("t") == "generation":
+                on_event(_json({**ev, "total_gens": gens}))
+    tr = Tracer(max_events=40000, on_emit=stream)
     best, base, arc, hist = evolutionary_search(
         seam=seam, instances=train, valid=valid, generations=gens, pop_size=pop,
         time_limit=cfg.get("time_limit", 6), verbose=False, tracer=tr)

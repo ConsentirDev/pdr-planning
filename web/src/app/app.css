@@ -89,6 +89,8 @@
 .rail-label { font-size: 13px; font-weight: 600; color: var(--tx); letter-spacing: 0.02em; }
 .rail-blurb { font-size: 11px; color: var(--tx-3); line-height: 1.35; font-family: var(--font-mono); }
 .rail-foot { margin-top: auto; padding: 14px 8px; line-height: 1.6; }
+.rail-thesis { display: block; text-decoration: none; transition: color 0.16s var(--ease); }
+.rail-thesis:hover { color: var(--cyan); }
 
 .stage { flex: 1; min-width: 0; overflow: auto; padding: 20px 24px; position: relative; }
 .stage-load { padding: 40px; }

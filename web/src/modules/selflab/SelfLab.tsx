@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { runtime } from "../../lib/runtime/runtime";
 import { useTracePlayer } from "../../lib/trace/player";
 import { Transport } from "../../lib/ui/Transport";
+import { Term } from "../../lib/ui/Term";
 import type { Ev, Trace } from "../../lib/trace/types";
 import { useMode } from "../../app/App";
 import {
@@ -33,6 +34,10 @@ export default function SelfLab() {
   const [trace, setTrace] = useState<Trace | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // live per-generation events streamed from the backend while it computes
+  const [live, setLive] = useState<Ev[]>([]);
+  const [elapsed, setElapsed] = useState(0);
+  const startedAt = useRef(0);
 
   const events = (trace?.events ?? []) as Ev[];
   const result = trace?.result as
@@ -45,16 +50,29 @@ export default function SelfLab() {
     () => (events.length ? deriveSelfLab(events, player.cursor) : null),
     [events, player.cursor]
   );
+  // while streaming, derive the live view from the events received so far
+  const liveSt = useMemo(
+    () => (live.length ? deriveSelfLab(live, live.length - 1) : null),
+    [live]
+  );
+  const streamedGen = live.length ? (live[live.length - 1] as any).gen ?? 0 : -1;
+  const totalGens = (live.length && (live[live.length - 1] as any).total_gens) || generations;
+
+  // elapsed-time ticker while a run is in flight
+  useEffect(() => {
+    if (!busy) return;
+    const id = setInterval(() => setElapsed((Date.now() - startedAt.current) / 1000), 200);
+    return () => clearInterval(id);
+  }, [busy]);
 
   async function run() {
-    setBusy(true);
-    setErr(null);
+    setBusy(true); setErr(null); setTrace(null); setLive([]); setElapsed(0);
+    startedAt.current = Date.now();
     try {
-      const t = await runtime.run({
-        module: "evolve",
-        seam,
-        config: { split, generations },
-      });
+      const t = await runtime.runStream(
+        { module: "evolve", seam, config: { split, generations } },
+        (ev) => setLive((cur) => [...cur, ev as Ev]),
+      );
       setTrace(t);
     } catch (e: any) {
       setErr(String(e?.message || e));
@@ -62,6 +80,8 @@ export default function SelfLab() {
       setBusy(false);
     }
   }
+
+  const showLive = busy && !trace;
 
   return (
     <div className="selflab">
@@ -73,8 +93,9 @@ export default function SelfLab() {
         busy={busy} run={run} err={err}
       />
 
-      {busy && !trace ? (
-        <Evolving seam={seam} />
+      {showLive ? (
+        <LiveProgress seam={seam} st={liveSt} gen={streamedGen} total={totalGens}
+          elapsed={elapsed} streaming={live.length > 0} backend={runtime.backend} />
       ) : !st ? (
         <Welcome mode={mode} busy={busy} />
       ) : (
@@ -88,10 +109,71 @@ export default function SelfLab() {
             <div className="sl-right">
               <OperatorCard st={st} resultKind={result?.best?.kind} />
               {mode === "learn" && <Narration st={st} split={traceSplit} />}
+              <HowItWorks compact />
             </div>
           </div>
           <Transport player={player} label={`generation ${st.gen} / ${st.totalGens}`} />
         </>
+      )}
+    </div>
+  );
+}
+
+/* ============================ live progress (the slow run, made legible) ===== */
+function LiveProgress({ seam, st, gen, total, elapsed, streaming, backend }: {
+  seam: string; st: SelfLabState | null; gen: number; total: number;
+  elapsed: number; streaming: boolean; backend: string;
+}) {
+  const pct = total > 0 ? Math.min(100, ((gen + 1) / total) * 100) : 0;
+  return (
+    <div className="sl-live">
+      <div className="sl-live-head panel">
+        <div className="sl-live-top">
+          <div>
+            <span className="eyebrow">evolving · <b style={{ color: "var(--cyan)" }}>{seam}</b> seam</span>
+            <div className="sl-live-title">
+              {streaming ? <>generation <b className="num">{gen + 1}</b> of <b className="num">{total}</b></>
+                : "warming up the curriculum…"}
+            </div>
+          </div>
+          <div className="sl-live-clock num">{elapsed.toFixed(1)}s</div>
+        </div>
+        <div className="sl-live-track">
+          <motion.div className="sl-live-fill" animate={{ width: `${streaming ? pct : 8}%` }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} />
+          {!streaming && <div className="sl-live-indeterminate" />}
+        </div>
+        <p className="sl-live-note">
+          {streaming
+            ? <>each generation runs the <b>real</b> planner across the whole training curriculum, gates every candidate for soundness, then ranks survivors on the held-out set — watch the champion improve below.</>
+            : backend === "server"
+              ? "the backend is spinning up the run — the first generation appears in a moment."
+              : "running in your browser (no backend) — this is the heavy module, so it can take a while; progress streaming needs the backend."}
+        </p>
+      </div>
+
+      {st ? (
+        <div className="sl-main">
+          <div className="sl-left">
+            <Headline st={st} split={true} />
+            <Leaderboard st={st} />
+            <Candidates st={st} />
+          </div>
+          <div className="sl-right">
+            <OperatorCard st={st} resultKind={undefined} />
+            <HowItWorks compact />
+          </div>
+        </div>
+      ) : (
+        <div className="sl-live-skeleton">
+          <div className="sl-evolving-row">
+            {["✦", "◆", "●", "◇", "✕", "◆", "●"].map((g, i) => (
+              <motion.span key={i} className="sl-evolving-glyph"
+                animate={{ opacity: [0.2, 1, 0.2], y: [0, -4, 0] }}
+                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.12 }}>{g}</motion.span>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -403,49 +485,60 @@ function Narration({ st, split }: { st: SelfLabState; split: boolean }) {
   );
 }
 
-/* ============================ welcome / loading ============================ */
-function Welcome({ mode, busy }: { mode: string; busy: boolean }) {
+/* ============================ how-it-works explainer ======================= */
+function HowItWorks({ compact }: { compact?: boolean }) {
   return (
-    <div className="sl-welcome">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <div className="sl-welcome-glyph">✦ ◆ ● ✕</div>
-        <h2>Let search invent better search.</h2>
-        <p className="sl-welcome-p">
-          The planner has <span className="hl">seams</span> — places where a tiny heuristic decides what to try next.
-          Here we <em>evolve</em> new operators for one seam, generation by generation. A verifiable harness referees:
-          the seams are <b>soundness-preserving</b>, so a candidate can only ever be{" "}
-          <span style={{ color: "var(--mint)" }}>slower</span>, never{" "}
-          <span style={{ color: "var(--rose)" }}>wrong</span> — the safety gate can't be cheated.
+    <div className={`panel sl-hiw ${compact ? "compact" : ""}`}>
+      <div className="panel-h">
+        <span className="eyebrow">how this works</span>
+        <span className="chip sl-overlay-chip">⚗ not from the thesis</span>
+      </div>
+      <ol className="sl-hiw-steps">
+        <li><b>propose</b> — seed + mutate operators for one <Term k="forallstep">seam</Term> (a tiny heuristic the planner consults).</li>
+        <li><b>gate</b> — a verifiable harness rejects any candidate that isn't <b>soundness-preserving</b>. A bad operator can only ever be <span style={{ color: "var(--mint)" }}>slower</span>, never <span style={{ color: "var(--rose)" }}>wrong</span>.</li>
+        <li><b>validate</b> — rank survivors on a <b>held-out</b> set, not the puzzles they were tuned on, so memorised winners are filtered out.</li>
+      </ol>
+      {!compact && (
+        <p className="sl-hiw-foot">
+          The reported speed-up is the honest, held-out number — the same discipline Ava’s evaluation uses.
         </p>
-        <p className="sl-welcome-p">
-          {mode === "learn"
-            ? "Pick a seam (progression has the most leverage) and press run; I'll narrate how held-out validation keeps it honest."
-            : "Pick a seam, keep the held-out split on, and press run."}
-        </p>
-        <p className="eyebrow">{busy ? "booting python in your browser…" : "press ▶ run above"}</p>
-      </motion.div>
+      )}
     </div>
   );
 }
 
-function Evolving({ seam }: { seam: string }) {
+/* ============================ welcome ============================ */
+function Welcome({ mode, busy }: { mode: string; busy: boolean }) {
   return (
     <div className="sl-welcome">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="sl-evolving">
-        <div className="sl-evolving-row">
-          {["✦", "◆", "●", "◇", "✕", "◆", "●"].map((g, i) => (
-            <motion.span
-              key={i}
-              className="sl-evolving-glyph"
-              animate={{ opacity: [0.2, 1, 0.2], y: [0, -4, 0] }}
-              transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.12 }}
-            >
-              {g}
-            </motion.span>
-          ))}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <span className="chip sl-overlay-chip big">⚗ experimental layer · not part of the thesis</span>
+        <h2 className="sl-welcome-h">Can search invent<br />better search?</h2>
+        <p className="sl-welcome-p">
+          Every other module here <em>visualises</em> Ava’s thesis. This one is different — it’s an
+          experiment layered <b>on top</b> of her planner. PDR has tiny decision points
+          (<span className="hl">seams</span>); here an evolutionary loop invents new heuristics for one
+          seam and a verifiable harness proves they stay correct.
+        </p>
+        <div className="sl-welcome-cols">
+          <HowItWorks />
+          <div className="sl-welcome-aside">
+            <p className="sl-welcome-p sm">
+              <b>Why it matters:</b> it’s self-improvement you can <em>trust</em> — the safety gate can’t be
+              cheated, and the win is measured on instances the operator never saw.
+            </p>
+            <p className="sl-welcome-p sm">
+              <b>Heads-up:</b> this is the heavy module — it runs the real planner hundreds of times. It
+              <b> streams its progress</b> generation by generation, so you watch it work rather than wait
+              on a frozen screen. More generations dig deeper (and take longer).
+            </p>
+            <p className="eyebrow">
+              {busy ? "starting the run…"
+                : mode === "learn" ? "pick a seam (progression has the most leverage) and press ▶ run"
+                  : "pick a seam, keep the held-out split on, and press ▶ run"}
+            </p>
+          </div>
         </div>
-        <h2 className="sl-evolving-h">evolving operators…</h2>
-        <p className="eyebrow">proposing &amp; gating candidates for the <b style={{ color: "var(--cyan)" }}>{seam}</b> seam · this can take a few seconds</p>
       </motion.div>
     </div>
   );

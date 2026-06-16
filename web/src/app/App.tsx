@@ -70,9 +70,12 @@ export function App() {
                 </span>
               </button>
             ))}
-            <div className="rail-foot eyebrow">
-              an interactive companion to<br />Ava Clifton's PDR thesis
-            </div>
+            <a className="rail-foot eyebrow rail-thesis"
+              href="https://openresearch-repository.anu.edu.au/server/api/core/bitstreams/6fc97901-050a-4b1f-81f5-4ca05fe88ba5/content"
+              target="_blank" rel="noopener noreferrer"
+              title="open Ava Clifton's PhD thesis (ANU)">
+              an interactive companion to<br />Ava Clifton's PDR thesis ↗
+            </a>
           </nav>
 
           <main className="stage">
