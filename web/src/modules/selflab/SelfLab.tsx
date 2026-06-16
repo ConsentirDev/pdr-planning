@@ -37,6 +37,7 @@ export default function SelfLab() {
   // live per-generation events streamed from the backend while it computes
   const [live, setLive] = useState<Ev[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  const [pickedCand, setPickedCand] = useState<string | null>(null);
   const startedAt = useRef(0);
 
   const events = (trace?.events ?? []) as Ev[];
@@ -95,7 +96,8 @@ export default function SelfLab() {
 
       {showLive ? (
         <LiveProgress seam={seam} st={liveSt} gen={streamedGen} total={totalGens}
-          elapsed={elapsed} streaming={live.length > 0} backend={runtime.backend} />
+          elapsed={elapsed} streaming={live.length > 0} backend={runtime.backend}
+          picked={pickedCand} onPick={setPickedCand} />
       ) : !st ? (
         <Welcome mode={mode} busy={busy} />
       ) : (
@@ -104,10 +106,15 @@ export default function SelfLab() {
             <div className="sl-left">
               <Headline st={st} split={traceSplit} />
               <Leaderboard st={st} />
-              <Candidates st={st} />
+              <Candidates st={st} picked={pickedCand} onPick={setPickedCand} />
             </div>
             <div className="sl-right">
-              <OperatorCard st={st} resultKind={result?.best?.kind} />
+              {(() => {
+                const picked = st.candidates.find((c) => c.name === pickedCand);
+                return picked
+                  ? <CandidateInspector c={picked} st={st} onClose={() => setPickedCand(null)} />
+                  : <OperatorCard st={st} resultKind={result?.best?.kind} />;
+              })()}
               {mode === "learn" && <Narration st={st} split={traceSplit} />}
               <HowItWorks compact />
             </div>
@@ -120,9 +127,10 @@ export default function SelfLab() {
 }
 
 /* ============================ live progress (the slow run, made legible) ===== */
-function LiveProgress({ seam, st, gen, total, elapsed, streaming, backend }: {
+function LiveProgress({ seam, st, gen, total, elapsed, streaming, backend, picked, onPick }: {
   seam: string; st: SelfLabState | null; gen: number; total: number;
   elapsed: number; streaming: boolean; backend: string;
+  picked?: string | null; onPick?: (name: string | null) => void;
 }) {
   const pct = total > 0 ? Math.min(100, ((gen + 1) / total) * 100) : 0;
   return (
@@ -157,10 +165,15 @@ function LiveProgress({ seam, st, gen, total, elapsed, streaming, backend }: {
           <div className="sl-left">
             <Headline st={st} split={true} />
             <Leaderboard st={st} />
-            <Candidates st={st} />
+            <Candidates st={st} picked={picked} onPick={onPick} />
           </div>
           <div className="sl-right">
-            <OperatorCard st={st} resultKind={undefined} />
+            {(() => {
+              const p = st.candidates.find((c) => c.name === picked);
+              return p
+                ? <CandidateInspector c={p} st={st} onClose={() => onPick?.(null)} />
+                : <OperatorCard st={st} resultKind={undefined} />;
+            })()}
             <HowItWorks compact />
           </div>
         </div>
@@ -368,10 +381,13 @@ function Leaderboard({ st }: { st: SelfLabState }) {
 }
 
 /* ============================ candidates / safety gate ============================ */
-function Candidates({ st }: { st: SelfLabState }) {
+function Candidates({ st, picked, onPick }: {
+  st: SelfLabState; picked?: string | null; onPick?: (name: string | null) => void;
+}) {
   const cs = st.candidates;
   const safe = cs.filter((c) => c.safe).length;
   const rejected = cs.length - safe;
+  const clickable = !!onPick;
   return (
     <div className="sl-cands panel">
       <div className="panel-h">
@@ -384,33 +400,107 @@ function Candidates({ st }: { st: SelfLabState }) {
       <div className="sl-cands-body">
         <AnimatePresence mode="popLayout">
           {cs.map((c) => (
-            <CandidateDot key={`${st.gen}:${c.name}`} c={c} />
+            <CandidateDot key={`${st.gen}:${c.name}`} c={c} clickable={clickable}
+              selected={picked === c.name} onClick={() => onPick?.(picked === c.name ? null : c.name)} />
           ))}
         </AnimatePresence>
         {cs.length === 0 && <span className="eyebrow sl-cands-empty">no proposals this generation</span>}
       </div>
       <div className="sl-cands-foot eyebrow">
-        the safety gate rejects any candidate that isn't soundness-preserving — a bad operator can only be <b>slower</b>, never <b>wrong</b>
+        {clickable ? <>click any candidate to see <b>what changed and why</b> — the safety gate rejects anything not soundness-preserving, so a bad operator can only be <b>slower</b>, never <b>wrong</b></>
+          : <>the safety gate rejects any candidate that isn't soundness-preserving — a bad operator can only be <b>slower</b>, never <b>wrong</b></>}
       </div>
     </div>
   );
 }
 
-function CandidateDot({ c }: { c: Candidate }) {
+function CandidateDot({ c, clickable, selected, onClick }: {
+  c: Candidate; clickable?: boolean; selected?: boolean; onClick?: () => void;
+}) {
   return (
-    <motion.div
-      className={`sl-cand ${c.safe ? "safe" : "unsafe"}`}
-      layout
+    <motion.button
+      className={`sl-cand ${c.safe ? "safe" : "unsafe"} ${selected ? "sel" : ""} ${clickable ? "click" : ""}`}
+      layout disabled={!clickable} onClick={onClick}
       initial={{ opacity: 0, scale: 0.6, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.6 }}
       transition={{ type: "spring", stiffness: 320, damping: 22 }}
-      title={`${c.name} · ${c.origin} · ${c.safe ? `${c.sat_calls} sat-calls` : "rejected by safety gate"}`}
+      title={c.reason || `${c.name} · ${c.origin}`}
     >
       <span className="sl-cand-mark">{c.safe ? "●" : "✕"}</span>
       <span className="sl-cand-name mono">{c.name}</span>
       <span className="sl-cand-v num">{c.safe ? c.sat_calls : "—"}</span>
-    </motion.div>
+    </motion.button>
+  );
+}
+
+/* ============================ candidate inspector (the working, per tweak) ==== */
+function CandidateInspector({ c, st, onClose }: { c: Candidate; st: SelfLabState; onClose: () => void }) {
+  const kind = classifySpec(c.spec, c.origin, c.kind);
+  const deltas = c.delta ? Object.entries(c.delta) : [];
+  const overfit = c.train != null && c.valid != null && c.train < c.valid;
+  return (
+    <div className="panel sl-cinsp">
+      <div className="panel-h">
+        <span className="eyebrow">candidate · the working</span>
+        <button className="sl-cinsp-close" onClick={onClose} title="back to the champion">✕</button>
+      </div>
+      <div className="sl-cinsp-name mono">
+        <span className={`sl-cand-mark ${c.safe ? "safe" : "unsafe"}`}>{c.safe ? "●" : "✕"}</span>
+        {c.name} <span className="chip sl-cinsp-origin">{c.origin}</span>
+      </div>
+
+      <div className={`sl-cinsp-verdict ${c.safe ? "ok" : "bad"}`}>
+        {c.safe ? "✓ " : "✕ "}{c.reason ?? (c.safe ? "safe" : "rejected")}
+      </div>
+
+      <div className="sl-cinsp-scores">
+        <Score k="valid sat-calls" v={c.valid ?? c.sat_calls} hint="the selection metric (held-out)" big />
+        {c.train != null && <Score k="train sat-calls" v={c.train} hint="on the tuning set" />}
+        {c.coverage != null && <Score k="coverage" v={`${c.coverage}/${c.n}`} hint="held-out instances solved" />}
+      </div>
+      {overfit && (
+        <div className="sl-cinsp-flag mono">
+          ▲ train ({c.train}) flatters it; we rank on the larger held-out <Term k="forallstep">validation</Term> set ({c.valid}).
+        </div>
+      )}
+
+      {c.parent ? (
+        <div className="sl-cinsp-card">
+          <div className="sl-cinsp-card-h">lineage · mutated from <span className="mono">{c.parent}</span>{st.scale != null && <> · step σ={st.scale}</>}</div>
+          {deltas.length ? (
+            <div className="sl-cinsp-delta">
+              {deltas.map(([k, d]) => (
+                <div className="sl-cinsp-drow" key={k}>
+                  <span className="mono sl-cinsp-dk">{k}</span>
+                  <span className={`mono sl-cinsp-dv ${d >= 0 ? "up" : "down"}`}>{d >= 0 ? "+" : ""}{d}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="sl-cinsp-note">no weight changed this round (an exact copy of the parent).</p>}
+          <p className="sl-cinsp-note">the tweak: perturb the parent’s weights by Gaussian noise, then re-measure on the held-out set.</p>
+        </div>
+      ) : (
+        <p className="sl-cinsp-note">origin <b>{c.origin}</b> — a {c.origin === "random" ? "fresh random" : "seeded"} operator, not derived from a parent.</p>
+      )}
+
+      <div className="sl-cinsp-card">
+        <div className="sl-cinsp-card-h">operator definition</div>
+        {kind === "weights" ? <Weights spec={c.spec} />
+          : kind === "source" ? <CodeBlock source={typeof c.spec === "string" ? c.spec : safeStringify(c.spec)} />
+          : <pre className="sl-code mono"><code>{safeStringify(c.spec)}</code></pre>}
+      </div>
+    </div>
+  );
+}
+
+function Score({ k, v, hint, big }: { k: string; v: any; hint?: string; big?: boolean }) {
+  return (
+    <div className="sl-score">
+      <b className={`num ${big ? "sl-score-big" : ""}`}>{v}</b>
+      <span className="eyebrow">{k}</span>
+      {hint && <span className="sl-score-hint">{hint}</span>}
+    </div>
   );
 }
 

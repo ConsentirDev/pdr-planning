@@ -258,6 +258,31 @@ def _mutate(weights, rng, scale, keys):
     return child
 
 
+def _cand_detail(o, e, split):
+    """A full, inspectable record of a candidate operator: its definition, scores,
+    lineage (parent + the per-weight diff that produced it), and — when the safety
+    gate rejected it — exactly why. This is the 'show the working' for evolution."""
+    spec = (o.spec if o.kind == "source"
+            else {k: round(v, 3) for k, v in o.spec.items()})
+    delta = None
+    if o.kind == "template" and isinstance(o.parent_spec, dict) and isinstance(o.spec, dict):
+        delta = {k: round(o.spec[k] - o.parent_spec.get(k, 0.0), 3)
+                 for k in o.spec if abs(o.spec[k] - o.parent_spec.get(k, 0.0)) > 1e-9}
+    # the gate's actual verdict, in words
+    if e.safe:
+        reason = "safe — solved every held-out instance"
+    elif e.coverage < e.n:
+        reason = f"rejected — solved only {e.coverage}/{e.n} held-out instances (must be sound on all)"
+    elif not e.valid:
+        reason = "rejected — produced an invalid run (not soundness-preserving)"
+    else:
+        reason = "rejected — failed the safety gate"
+    return {"name": o.name, "origin": o.origin, "kind": o.kind, "spec": spec,
+            "sat_calls": e.sat_calls, "train": e.train_sat, "valid": e.valid_sat,
+            "coverage": e.coverage, "n": e.n, "safe": e.safe,
+            "parent": o.parent, "delta": delta, "reason": reason}
+
+
 def evolutionary_search(seam="obligation", instances=None, valid=None, generations=6,
                         pop_size=10, elite=3, scale=0.6, seed=0,
                         time_limit=4.0, k_cap=60, archive=None, verbose=True, tracer=None):
@@ -297,15 +322,13 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
         history.append(best[1].sat_calls if best[1].safe else None)
         if tracer:
             tracer.emit("generation", gen=gen, seam=seam,
-                        baseline=baseline_ev.sat_calls,
+                        baseline=baseline_ev.sat_calls, scale=round(scale, 3),
                         best={"name": best[0].name, "origin": best[0].origin,
                               "sat_calls": best[1].sat_calls,
                               "train": best[1].train_sat, "valid": best[1].valid_sat,
                               "spec": best[0].spec if best[0].kind == "source"
                               else {k: round(v, 3) for k, v in best[0].spec.items()}},
-                        candidates=[{"name": o.name, "origin": o.origin,
-                                     "sat_calls": e.sat_calls, "safe": e.safe}
-                                    for o, e in scored],
+                        candidates=[_cand_detail(o, e, split) for o, e in scored],
                         archive=[{"name": n, "sat_calls": sc} for n, sc in archive.summary()])
         if verbose:
             b = best
@@ -319,8 +342,10 @@ def evolutionary_search(seam="obligation", instances=None, valid=None, generatio
         while len(nxt) < pop_size:
             par = parents[gi % len(parents)]
             base_w = par.spec if par.kind == "template" else _random_weights(rng, keys, scale)
-            child = _mutate(base_w if isinstance(base_w, dict) else {}, rng, scale, keys)
-            nxt.append(Operator(f"g{gen}m{len(nxt)}", seam, "template", child, origin="mutation"))
+            base_w = base_w if isinstance(base_w, dict) else {}
+            child = _mutate(base_w, rng, scale, keys)
+            nxt.append(Operator(f"g{gen}m{len(nxt)}", seam, "template", child,
+                                origin="mutation", parent=par.name, parent_spec=dict(base_w)))
             gi += 1
         pop = nxt
 

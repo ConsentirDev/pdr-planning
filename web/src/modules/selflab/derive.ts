@@ -6,6 +6,16 @@ export interface Candidate {
   origin: string;
   sat_calls: number;
   safe: boolean;
+  // rich, inspectable detail (present on streamed/backend runs)
+  kind?: string;
+  spec?: any;
+  train?: number;
+  valid?: number;
+  coverage?: number;
+  n?: number;
+  parent?: string | null;
+  delta?: Record<string, number> | null; // the per-weight tweak vs the parent
+  reason?: string;                        // the safety gate's verdict, in words
 }
 export interface BestOp {
   name: string;
@@ -24,6 +34,7 @@ export interface GenerationEv {
   gen: number;
   seam: string;
   baseline: number;
+  scale?: number; // the mutation step size (σ) used this generation
   best: BestOp;
   candidates: Candidate[];
   archive: ArchiveEntry[];
@@ -46,6 +57,7 @@ export interface SelfLabState {
   worst: number; // largest sat_calls seen (for bar scaling)
   isFirst: boolean;
   improvedFromPrev: boolean; // best improved vs previous generation
+  scale?: number; // mutation step size this generation
 }
 
 export function deriveSelfLab(events: Ev[], cursor: number): SelfLabState | null {
@@ -73,6 +85,7 @@ export function deriveSelfLab(events: Ev[], cursor: number): SelfLabState | null
     worst,
     isFirst: idx === 0,
     improvedFromPrev: prev ? cur.best.sat_calls < prev.best.sat_calls : false,
+    scale: cur.scale,
   };
 }
 

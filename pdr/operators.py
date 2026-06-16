@@ -176,6 +176,8 @@ class Operator:
     kind: str           # "template" | "source"
     spec: object        # weights dict OR source string
     origin: str = "seed"
+    parent: str = None          # name of the operator this was mutated from (lineage)
+    parent_spec: object = field(default=None, repr=False)  # parent weights, for the diff
     _callable: object = field(default=None, repr=False)
 
     _TEMPLATES = {"obligation": template_obligation, "reason": template_reason,
