@@ -78,7 +78,7 @@ export interface PdrResult { solvable: boolean | null; plan: string[][]; stats: 
 export interface FondResult { has_policy: boolean | null; truth: boolean; stats: Stats }
 
 export interface Trace {
-  module: "pdr" | "race" | "fond" | "decomp" | "evolve";
+  module: "pdr" | "race" | "fond" | "decomp" | "evolve" | "evaluate";
   meta?: Meta | { seam: string; split: boolean };
   events?: Ev[];
   runs?: { name: string; events: Ev[]; result: PdrResult }[];

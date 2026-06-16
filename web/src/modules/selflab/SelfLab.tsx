@@ -17,6 +17,7 @@ import {
   type Candidate,
 } from "./derive";
 import { CodeBlock } from "./CodeBlock";
+import { Bench } from "./Bench";
 import "./selflab.css";
 
 const SEAMS: { id: Seam; label: string; note: string }[] = [
@@ -38,6 +39,7 @@ export default function SelfLab() {
   const [live, setLive] = useState<Ev[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [pickedCand, setPickedCand] = useState<string | null>(null);
+  const [view, setView] = useState<"evolve" | "bench">("evolve");
   const startedAt = useRef(0);
 
   const events = (trace?.events ?? []) as Ev[];
@@ -84,8 +86,24 @@ export default function SelfLab() {
 
   const showLive = busy && !trace;
 
+  const benchView = mode === "lab" && view === "bench";
+
   return (
     <div className="selflab">
+      {mode === "lab" && (
+        <div className="sl-viewtabs">
+          {(["evolve", "bench"] as const).map((v) => (
+            <button key={v} className={`sl-vtab ${view === v ? "on" : ""}`} onClick={() => setView(v)}>
+              {v === "evolve" ? "▶ evolution" : "⚖ bench · queue & compare"}
+            </button>
+          ))}
+          <span className="sl-vtab-note eyebrow">
+            {benchView ? "queue specific operators / runs and compare them per-instance" : "watch search invent better search, generation by generation"}
+          </span>
+        </div>
+      )}
+
+      {benchView ? <Bench /> : <>
       <Controls
         mode={mode}
         seam={seam} setSeam={setSeam}
@@ -122,6 +140,7 @@ export default function SelfLab() {
           <Transport player={player} label={`generation ${st.gen} / ${st.totalGens}`} />
         </>
       )}
+      </>}
     </div>
   );
 }

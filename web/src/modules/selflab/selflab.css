@@ -176,6 +176,14 @@
 .sl-hiw.compact .sl-hiw-steps li { font-size: 12px; }
 .sl-hiw-foot { margin: 12px 0 0; font-size: 12.5px; color: var(--tx-3); line-height: 1.5; font-style: italic; }
 
+/* view tabs (lab: evolution | bench) */
+.sl-viewtabs { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.sl-vtab { font-family: var(--font-mono); font-size: 12px; padding: 7px 15px; border-radius: 999px;
+  background: transparent; color: var(--tx-3); border: 1px solid var(--line); cursor: pointer; transition: all 0.15s var(--ease); }
+.sl-vtab:hover { color: var(--tx); }
+.sl-vtab.on { background: rgba(58,214,223,0.1); color: var(--cyan); border-color: var(--cyan-dim); text-shadow: var(--glow-cyan); }
+.sl-vtab-note { color: var(--tx-3); margin-left: 4px; }
+
 /* clickable candidate dots */
 button.sl-cand { font: inherit; color: inherit; cursor: default; text-align: left; }
 button.sl-cand.click { cursor: pointer; transition: border-color 0.14s var(--ease), box-shadow 0.14s var(--ease), transform 0.1s var(--ease); }
