@@ -30,8 +30,8 @@ strongest part of the work.
 Everything else should be read as a **prototype on small, plan-rich demo
 domains**. The [Empirical results](#empirical-results--captured-reproducible-negatives-included)
 section reports what actually happens when you run it on real IPC instances —
-including the finding that the discovered operator generalises on SAT-calls but is
-*slower in wall-clock* than the baseline there — and [Threats to validity](#methodology--threats-to-validity)
+including the finding that the discovered operator cuts SAT-calls 4.5× yet is **no
+faster in wall-clock** there — and [Threats to validity](#methodology--threats-to-validity)
 is not glossed. Reproduce any of it with `python3 -m pdr.experiments <name>`.
 
 ---
@@ -242,23 +242,25 @@ We evaluated three progression operators — baseline `F=1`, fixed PDR-M `F=3`, 
 `llm-discovered-smooth` operator (tuned only on synthetic logistics/blocks) — on **10
 real IPC instances** (gripper, miconic, movie) the operator had **never seen**. These
 are the held-out *domains* the review asked for; gripper is structurally unlike
-logistics. Totals over the 10 instances (all solved):
+logistics. Totals over the 10 instances (all solved), **engine pinned to minisat22**:
 
 | operator | SAT calls | wall-clock | verdict |
 |---|---:|---:|---|
-| baseline `F=1` | 20807 | **4238 ms** | most calls, **fastest in time** |
-| PDR-M `F=3` | 9242 | 7464 ms | |
-| discovered (tuned on synthetic) | **5432** | 7426 ms | **fewest calls**, but ~1.75× slower than `F=1` |
+| baseline `F=1` | 21122 | 1393 ms | most calls |
+| PDR-M `F=3` | 9327 | 1445 ms | |
+| discovered (tuned on synthetic) | **4707** | 1433 ms | **4.5x fewer calls, ~0% faster** |
 
 Two honest findings in one table:
 1. **The discovered operator *does* generalise** to unseen real domains on the metric
-   it was selected by — 5432 SAT calls vs 9242 (PDR-M) vs 20807 (baseline). It is not
-   merely memorising logistics.
-2. **…but SAT-calls ≠ runtime, demonstrated on real IPC.** Baseline `F=1` issues **4×
-   more SAT calls yet is the fastest in wall-clock** — because on gripper the extra
-   calls are cheap, while `F≥3` issues *fewer but harder* queries. This is exactly the
-   reviewer's #1 concern, confirmed on a substrate we did not design. **The headline
-   speed-ups are "fewer queries," not "faster planner."**
+   it was selected by — 4707 SAT calls vs 9327 (PDR-M) vs 21122 (baseline), a 4.5x
+   reduction. It is not merely memorising logistics.
+2. **…but SAT-calls ≠ runtime, demonstrated on real IPC.** That 4.5x call reduction
+   buys **essentially no wall-clock improvement** (1433 ms vs 1393 ms — a *tie*),
+   because `F>=3` trades many cheap SAT calls for fewer expensive ones. (Under the
+   faster Lingeling backend the gap flips further — baseline `F=1` becomes the
+   *fastest* in wall-clock despite 4x the calls.) Either way: **the headline speed-ups
+   are "fewer queries," not "faster planner"** — exactly the reviewer's #1 concern,
+   confirmed on a substrate we did not design.
 
 ### (#1) Do the two metrics agree? (`fitness`)
 On the synthetic curriculum the SAT-call-best and wall-clock-best configs agree on

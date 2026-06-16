@@ -326,8 +326,24 @@ def exp_crossdomain():
 # ---------------------------------------------------------------------------
 # entry point
 # ---------------------------------------------------------------------------
+def _pin_engine():
+    """Pin a fixed SAT engine so SAT-call counts are reproducible across machines
+    (counts are engine-dependent). minisat22 matches evolve's FITNESS_ENGINE."""
+    try:
+        from . import sat as _sat
+        if _sat.have_pysat():
+            prev = _sat.pysat_solver_name()
+            _sat.set_pysat_solver("minisat22")
+            print("  [engine pinned: minisat22 — SAT-call counts are reproducible under it]")
+            return prev
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 def main(argv):
     which = argv[1] if len(argv) > 1 else "all"
+    _pin_engine()
     if which in ("selector", "all"):
         exp_selector()
     if which in ("crossdomain", "all"):
